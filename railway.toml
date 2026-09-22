@@ -1,6 +1,9 @@
 # Reference config. Railway services are usually created in the dashboard
 # (New Service -> same repo, set Root Directory per service), but this file
 # documents the intended setup and can drive `railway up` per-service too.
+#
+# nixpacks.toml (repo root) adds python3 to the build environment so
+# node-gyp can compile native modules (the `usb` package needs it).
 
 [build]
 builder = "NIXPACKS"
