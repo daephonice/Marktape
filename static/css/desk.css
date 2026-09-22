@@ -51,39 +51,10 @@ a:hover { color: var(--accent); }
 
 main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 
-/* Board table */
-.board-wrap { overflow-x: auto; }
-.board-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.board-table th {
-  text-align: left;
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-}
-.board-row {
-  cursor: pointer;
-  border-bottom: 1px solid var(--line);
-}
-.board-row:hover { background: var(--surface); }
-.board-row td { padding: 12px; font-size: 14px; white-space: nowrap; }
-.col-symbol { display: flex; align-items: center; gap: 10px; }
-.row-logo { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
-.row-symbol { font-weight: 600; }
-.row-name { color: var(--muted); font-size: 12px; }
-.col-premium { font-family: var(--font-mono); font-weight: 700; font-size: 15px; }
+/* Shared premium status colors — used on token/share pages */
 .status-cheap { color: var(--cheap); }
 .status-rich { color: var(--rich); }
 .status-flat { color: var(--muted); }
-.empty-state { padding: 60px 0; text-align: center; color: var(--muted); }
-
-/* Mobile board: hide secondary columns */
-@media (max-width: 640px) {
-  .col-val, .col-supply { display: none; }
-}
 
 /* Token page */
 .token-wrap {
@@ -253,3 +224,243 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 
 .fade-refresh { animation: fadeNum 200ms ease; }
 @keyframes fadeNum { from { opacity: 0.3; } to { opacity: 1; } }
+
+/* ==========================================================================
+   Homepage redesign — stone & ink. Scoped to body.mkt-home only.
+   Token/share pages keep the original theme above untouched.
+   ========================================================================== */
+body.mkt-home {
+  background: #0E0F0C;
+  color: #E8E4D9;
+  font-family: 'Geist', -apple-system, sans-serif;
+}
+body.mkt-home a { color: inherit; }
+
+.mkt-frame {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (min-width: 1024px) {
+  .mkt-frame { padding: 0 40px; }
+}
+@media (max-width: 640px) {
+  .mkt-frame { padding: 0 20px; }
+}
+
+/* Header */
+.mkt-header {
+  background: #161714;
+  border-bottom: 1px solid #2A2B27;
+  height: 64px;
+}
+.mkt-header-inner {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mkt-header-left { display: flex; align-items: center; gap: 12px; }
+.mkt-wordmark {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: #C4B49A;
+}
+.mkt-hairline-v { width: 1px; height: 12px; background: #2A2B27; display: inline-block; }
+.mkt-updated {
+  font-family: 'Geist', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #6F6B61;
+}
+.mkt-updated.stale { color: #C48B84; }
+.mkt-alerts {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #C4B49A;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+.mkt-alerts:hover { border-bottom-color: #2A2B27; }
+
+@media (max-width: 640px) {
+  .mkt-header-inner { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; height: auto; }
+  .mkt-header { height: auto; }
+  .mkt-header-left { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .mkt-hairline-v { display: none; }
+}
+
+/* Thesis */
+.mkt-thesis {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: #9A9588;
+  margin: 28px 0 0;
+}
+@media (max-width: 640px) {
+  .mkt-thesis { font-size: 14px; }
+}
+
+/* Strip */
+.mkt-strip {
+  display: flex;
+  height: 48px;
+  margin-top: 20px;
+  border-top: 1px solid #2A2B27;
+  border-bottom: 1px solid #2A2B27;
+}
+.mkt-strip-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 16px;
+  border-left: 1px solid #2A2B27;
+}
+.mkt-strip-cell:first-child { border-left: none; padding-left: 0; }
+.mkt-strip-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6F6B61;
+  font-weight: 500;
+}
+.mkt-strip-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: #E8E4D9;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .mkt-strip { height: auto; flex-direction: column; border-top: none; }
+  .mkt-strip-cell {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    height: 36px;
+    border-left: none;
+    border-top: 1px solid #2A2B27;
+    padding: 0;
+  }
+}
+
+/* Tape */
+.mkt-tape { margin-top: 28px; }
+.mkt-empty {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: #9A9588;
+  margin-top: 40px;
+}
+.mkt-tape-head {
+  display: grid;
+  grid-template-columns: 36px 220px 108px 120px 120px 1fr;
+  gap: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #2A2B27;
+}
+.mkt-tape-head span {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6F6B61;
+}
+.mkt-tape-head .col-premium,
+.mkt-tape-head .col-tape,
+.mkt-tape-head .col-mark,
+.mkt-tape-head .col-implied { text-align: right; }
+
+.mkt-row {
+  display: grid;
+  grid-template-columns: 36px 220px 108px 120px 120px 1fr;
+  align-items: center;
+  height: 56px;
+  border-bottom: 1px solid #2A2B27;
+  cursor: pointer;
+}
+.mkt-row:hover { background: #1C1D1A; }
+.mkt-row:hover .mkt-ticker { color: #FFFFFF; }
+
+.mkt-logo { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(232,228,217,0.15); object-fit: cover; }
+.mkt-logo-empty { background: #1C1D1A; display: inline-block; }
+
+.mkt-name { display: flex; flex-direction: column; gap: 2px; }
+.mkt-ticker { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; color: #E8E4D9; }
+.mkt-fullname { font-size: 12px; color: #9A9588; }
+
+.mkt-premium {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mkt-tape-price, .mkt-mark-price {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mkt-tape-price { color: #E8E4D9; }
+.mkt-mark-price { color: #9A9588; }
+.mkt-implied {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  text-align: right;
+  color: #9A9588;
+  font-variant-numeric: tabular-nums;
+}
+.mkt-mobile-line { display: none; }
+
+.mkt-row.fade-refresh .mkt-premium,
+.mkt-row.fade-refresh .mkt-tape-price,
+.mkt-row.fade-refresh .mkt-mark-price { animation: fadeNum 160ms ease; }
+
+/* Mobile tape */
+@media (max-width: 640px) {
+  .mkt-tape-head { display: none; }
+  .mkt-row {
+    grid-template-columns: 28px 1fr auto;
+    grid-template-rows: auto auto;
+    height: auto;
+    min-height: 72px;
+    padding: 12px 0;
+    row-gap: 4px;
+    column-gap: 10px;
+  }
+  .mkt-logo { grid-row: 1 / 2; }
+  .mkt-name { grid-row: 1 / 2; flex-direction: row; align-items: baseline; gap: 8px; }
+  .mkt-fullname { display: none; }
+  .mkt-premium { grid-row: 1 / 2; font-size: 15px; }
+  .mkt-tape-price, .mkt-mark-price, .mkt-implied { display: none; }
+  .mkt-mobile-line {
+    display: block;
+    grid-column: 2 / 4;
+    grid-row: 2 / 3;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: #9A9588;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Footer */
+.mkt-footer { margin-top: 64px; border-top: 1px solid #2A2B27; padding: 24px 0 40px; }
+.mkt-footer-links { font-size: 12px; color: #9A9588; }
+.mkt-footer-links a:hover { color: #C4B49A; }
+.mkt-footer-links .dot { margin: 0 8px; color: #6F6B61; }
+.mkt-legal {
+  margin-top: 16px;
+  max-width: 560px;
+  font-size: 11px;
+  line-height: 17px;
+  color: #6F6B61;
+}
