@@ -25,17 +25,17 @@ Not advice. Marktape does not custody funds.
 ## Repo layout
 
 ```
-apps/web/      Next.js 15 site + /api/*
+apps/web/      Next.js 15 Pages Router site + /api/*
 apps/bot/      Grammy Telegram bot + 60s alert loop
 packages/core/ shared types, PreStocks client, premium math, DB, multiplier
-sql/           SQL migration scripts (run manually on Railway Postgres)
+sql/           SQL migration script (backup reference — tables auto-create on boot)
 ```
 
 ## Setup
 
 1. `npm install` at repo root (npm workspaces).
 2. Copy `.env.example` to `.env` in `apps/web` and `apps/bot`, fill values (see below).
-3. `npm run dev:web` and `npm run dev:bot`. Tables are created automatically on first DB call (`ensureSchema()` in `packages/core/src/migrate.ts`) — no manual SQL step needed. `sql/001_init.sql` is kept only as a manual-run reference/backup.
+3. `npm run dev:web` and `npm run dev:bot`. Tables are created automatically on first DB call (`ensureSchema()` in `packages/core/migrate.ts`) — no manual SQL step needed. `sql/001_init.sql` is kept only as a manual-run reference/backup.
 
 ## Environment variables
 
