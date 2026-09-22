@@ -1,0 +1,12 @@
+{
+  "name": "marktape",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build:core": "npm run build -w @marktape/core",
+    "dev:web": "npm run dev -w @marktape/web",
+    "dev:bot": "npm run build:core && npm run dev -w @marktape/bot",
+    "build:web": "npm run build:core && npm run build -w @marktape/web",
+    "build:bot": "npm run build:core && npm run build -w @marktape/bot"
+  }
+}
