@@ -25,11 +25,24 @@ templates.env.globals["format_premium"] = prestocks.format_premium
 templates.env.globals["premium_status"] = prestocks.premium_status
 
 
+def _strip_facts(tokens: list) -> dict:
+    priced = [t for t in tokens if t.get("premium") is not None]
+    if not priced:
+        return {"cheapest": None, "richest": None, "count": len(tokens)}
+    cheapest = min(priced, key=lambda t: t["premium"])
+    richest = max(priced, key=lambda t: t["premium"])
+    return {
+        "cheapest": cheapest if cheapest["premium"] < 0 else None,
+        "richest": richest if richest["premium"] > 0 else None,
+        "count": len(tokens),
+    }
+
+
 @router.get("/", response_class=HTMLResponse)
 async def board_page(request: Request):
     snap = prestocks.get_cached_snapshot()
     return templates.TemplateResponse(
-        request, "board.html", {"snapshot": snap}
+        request, "board.html", {"snapshot": snap, "strip": _strip_facts(snap.get("tokens", []))}
     )
 
 
