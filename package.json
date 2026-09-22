@@ -2,6 +2,9 @@
   "name": "marktape",
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "scripts": {
     "build:core": "npm run build -w @marktape/core",
     "dev:web": "npm run dev -w @marktape/web",

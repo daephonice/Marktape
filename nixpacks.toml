@@ -3,4 +3,4 @@
 # @solana/wallet-adapter-wallets for hardware wallet support, requires it).
 
 [phases.setup]
-nixPkgs = ["python3", "nodejs_18", "npm-9_x"]
+nixPkgs = ["python3", "nodejs_20", "npm-9_x"]
