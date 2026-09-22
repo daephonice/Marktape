@@ -16,7 +16,7 @@ No Tessera, xStocks, Backpack, or other pre-IPO issuers.
 ## Stack
 
 FastAPI + Jinja + vanilla JS + Aiogram + Postgres. Deployed on Railway from
-this repo. Same shape as Daephon Casino.
+this repo.
 
 ## Disclaimer
 
