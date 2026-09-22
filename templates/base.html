@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{% block title %}Marktape — mark vs tape for PreStocks{% endblock %}</title>
   <meta name="description" content="Mark vs tape for PreStocks. Live board, in-page Jupiter swap, Telegram alerts.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@1,400&family=Geist:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/desk.css?v={{ static_v('css/desk.css') }}">
   {% block styles %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+  {% block header %}
   <header class="site-header">
     <a href="/" class="wordmark">MARKTAPE</a>
     <div class="header-right">
@@ -18,11 +21,13 @@
       {% endif %}
     </div>
   </header>
+  {% endblock %}
 
   <main>
     {% block content %}{% endblock %}
   </main>
 
+  {% block footer %}
   <footer class="site-footer">
     <p class="disclaimer">
       PreStocks tokens provide economic exposure only via an SPV — not shares, not an affiliation with the named
@@ -37,6 +42,7 @@
     </p>
     <p class="footer-fine">Data: PreStocks API. Execution: Jupiter Ultra, signed in your wallet. Prices can be stale.</p>
   </footer>
+  {% endblock %}
 
   <script src="/static/js/wallet.js?v={{ static_v('js/wallet.js') }}"></script>
   {% block scripts %}{% endblock %}

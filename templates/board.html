@@ -1,43 +1,96 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="board-wrap">
-  {% if not snapshot.tokens %}
-  <div class="empty-state">
-    <p>Board is warming up. Prices refresh every ~45s.</p>
+{% block body_class %}mkt-home{% endblock %}
+
+{% block header %}
+<header class="mkt-header">
+  <div class="mkt-frame mkt-header-inner">
+    <div class="mkt-header-left">
+      <a href="/" class="mkt-wordmark">Marktape</a>
+      <span class="mkt-hairline-v"></span>
+      <span class="mkt-updated" id="last-refresh" data-fetched-at="{{ snapshot.fetchedAt or '' }}">updated —</span>
+    </div>
+    {% if telegram_public_url %}
+    <a class="mkt-alerts" href="{{ telegram_public_url }}" target="_blank" rel="noopener">Alerts →</a>
+    {% endif %}
   </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="mkt-frame">
+  <p class="mkt-thesis">Onchain price versus the issuer mark.</p>
+
+  <div class="mkt-strip">
+    <div class="mkt-strip-cell" id="mkt-strip-cheapest">
+      <span class="mkt-strip-label">Cheapest</span>
+      {% if strip.cheapest %}
+      <span class="mkt-strip-value">{{ strip.cheapest.symbol }} <span class="status-cheap">{{ format_premium(strip.cheapest.premium) }}</span></span>
+      {% else %}
+      <span class="mkt-strip-value">—</span>
+      {% endif %}
+    </div>
+    <div class="mkt-strip-cell" id="mkt-strip-richest">
+      <span class="mkt-strip-label">Richest</span>
+      {% if strip.richest %}
+      <span class="mkt-strip-value">{{ strip.richest.symbol }} <span class="status-rich">{{ format_premium(strip.richest.premium) }}</span></span>
+      {% else %}
+      <span class="mkt-strip-value">—</span>
+      {% endif %}
+    </div>
+    <div class="mkt-strip-cell" id="mkt-strip-count">
+      <span class="mkt-strip-label">{{ strip.count }} Names</span>
+      <span class="mkt-strip-value">live</span>
+    </div>
+  </div>
+
+  {% if not snapshot.tokens %}
+  <p class="mkt-empty">Tape is warming up. First print any moment.</p>
   {% else %}
-  <table class="board-table" id="board-table">
-    <thead>
-      <tr>
-        <th class="col-symbol">Name</th>
-        <th class="col-premium">Premium</th>
-        <th class="col-price">Token Price</th>
-        <th class="col-price">Mark Price</th>
-        <th class="col-val">Implied Val</th>
-        <th class="col-val">Mark Val</th>
-        <th class="col-supply">Supply</th>
-      </tr>
-    </thead>
-    <tbody>
+  <div class="mkt-tape" id="mkt-tape">
+    <div class="mkt-tape-head">
+      <span class="col-name">Name</span>
+      <span class="col-premium">Premium</span>
+      <span class="col-tape">Tape</span>
+      <span class="col-mark">Mark</span>
+      <span class="col-implied">Implied</span>
+    </div>
+    <div class="mkt-tape-body" id="mkt-tape-body">
       {% for t in snapshot.tokens %}
-      <tr class="board-row" onclick="window.location.href='/t/{{ t.symbol }}'">
-        <td class="col-symbol">
-          {% if t.image %}<img class="row-logo" src="{{ t.image }}" alt="" loading="lazy">{% endif %}
-          <span class="row-symbol">{{ t.symbol }}</span>
-          <span class="row-name">{{ t.name }}</span>
-        </td>
-        <td class="col-premium status-{{ premium_status(t.premium) }}">{{ format_premium(t.premium) }}</td>
-        <td class="col-price mono">${{ "%.2f"|format(t.tokenPrice) if t.tokenPrice is not none else "—" }}</td>
-        <td class="col-price mono">${{ "%.2f"|format(t.markPrice) if t.markPrice is not none else "—" }}</td>
-        <td class="col-val mono">{{ "${:,.0f}".format(t.impliedValuation) if t.impliedValuation else "—" }}</td>
-        <td class="col-val mono">{{ "${:,.0f}".format(t.markValuation) if t.markValuation else "—" }}</td>
-        <td class="col-supply mono">{{ "{:,.0f}".format(t.supply) if t.supply else "—" }}</td>
-      </tr>
+      <a href="/t/{{ t.symbol }}" class="mkt-row">
+        {% if t.image %}<img class="mkt-logo" src="{{ t.image }}" alt="" loading="lazy">{% else %}<span class="mkt-logo mkt-logo-empty"></span>{% endif %}
+        <span class="mkt-name">
+          <span class="mkt-ticker">{{ t.symbol }}</span>
+          <span class="mkt-fullname">{{ t.name }}</span>
+        </span>
+        <span class="mkt-premium status-{{ premium_status(t.premium) }}">{{ format_premium(t.premium) }}</span>
+        <span class="mkt-tape-price">${{ "%.2f"|format(t.tokenPrice) if t.tokenPrice is not none else "—" }}</span>
+        <span class="mkt-mark-price">${{ "%.2f"|format(t.markPrice) if t.markPrice is not none else "—" }}</span>
+        <span class="mkt-implied">{{ "${:,.0f}".format(t.impliedValuation) if t.impliedValuation else "—" }}</span>
+        <span class="mkt-mobile-line">${{ "%.2f"|format(t.tokenPrice) if t.tokenPrice is not none else "—" }} tape · ${{ "%.2f"|format(t.markPrice) if t.markPrice is not none else "—" }} mark</span>
+      </a>
       {% endfor %}
-    </tbody>
-  </table>
+    </div>
+  </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block footer %}
+<footer class="mkt-footer">
+  <div class="mkt-frame">
+    <div class="mkt-footer-links">
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+      {% if telegram_public_url %}
+      <span class="dot">·</span><a href="{{ telegram_public_url }}" target="_blank" rel="noopener">{{ telegram_public_url.replace('https://t.me/', 't.me/') }}</a>
+      {% endif %}
+      <span class="dot">·</span><a href="https://prestocks.com" target="_blank" rel="noopener">PreStocks</a>
+    </div>
+    <p class="mkt-legal">
+      Economic exposure only. Not shares, not for US persons, not advice.<br>
+      Swaps sign in your wallet. Marktape does not custody funds.
+    </p>
+  </div>
+</footer>
 {% endblock %}
 
 {% block scripts %}
