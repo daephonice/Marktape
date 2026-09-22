@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ token.symbol }} — Marktape{% endblock %}
+{% block content %}
+<div class="share-card">
+  <div class="share-symbol">{{ token.symbol }}</div>
+  <div class="share-premium status-{{ premium_status(token.premium) }}">{{ format_premium(token.premium) }} vs mark</div>
+  <div class="share-prices mono">${{ "%.2f"|format(token.tokenPrice) if token.tokenPrice is not none else "—" }} tape · ${{ "%.2f"|format(token.markPrice) if token.markPrice is not none else "—" }} mark</div>
+  <div class="share-wordmark">MARKTAPE</div>
+</div>
+{% endblock %}

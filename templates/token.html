@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ token.symbol }} — Marktape{% endblock %}
+{% block content %}
+<div class="token-wrap" id="token-page"
+     data-symbol="{{ token.symbol }}"
+     data-mint="{{ token.mint }}"
+     data-token-price="{{ token.tokenPrice }}"
+     data-mark-price="{{ token.markPrice }}">
+
+  <div class="token-left">
+    <a href="/" class="back-link">← Board</a>
+    <div class="token-hero">
+      {% if token.image %}<img class="token-logo" src="{{ token.image }}" alt="">{% endif %}
+      <div>
+        <h1 class="token-symbol">{{ token.symbol }}</h1>
+        <p class="token-name">{{ token.name }}</p>
+      </div>
+    </div>
+
+    <div class="premium-pill status-{{ premium_status(token.premium) }}">{{ format_premium(token.premium) }}</div>
+
+    <div class="tape-mark-row">
+      <div class="big-number">
+        <span class="label">TAPE</span>
+        <span class="value mono">${{ "%.2f"|format(token.tokenPrice) if token.tokenPrice is not none else "—" }}</span>
+      </div>
+      <div class="big-number">
+        <span class="label">MARK</span>
+        <span class="value mono">${{ "%.2f"|format(token.markPrice) if token.markPrice is not none else "—" }}</span>
+      </div>
+    </div>
+
+    <div class="val-row">
+      <div><span class="label">Implied Val</span><span class="mono">{{ "${:,.0f}".format(token.impliedValuation) if token.impliedValuation else "—" }}</span></div>
+      <div><span class="label">Mark Val</span><span class="mono">{{ "${:,.0f}".format(token.markValuation) if token.markValuation else "—" }}</span></div>
+      <div><span class="label">Supply</span><span class="mono">{{ "{:,.0f}".format(token.supply) if token.supply else "—" }}</span></div>
+    </div>
+
+    <div class="meta-row">
+      <span class="label">Mint</span>
+      <code class="mint-code" id="mint-copy" data-mint="{{ token.mint }}">{{ token.mint }}</code>
+      {% if token.externalUrl %}<a href="{{ token.externalUrl }}" target="_blank" rel="noopener">prestocks.com ↗</a>{% endif %}
+    </div>
+
+    {% if token.description %}<p class="token-description">{{ token.description }}</p>{% endif %}
+
+    {% if telegram_bot_username %}
+    <a class="btn-telegram" href="https://t.me/{{ telegram_bot_username }}?start={{ token.symbol }}" target="_blank" rel="noopener">
+      Watch this in Telegram
+    </a>
+    {% endif %}
+
+    <button class="btn-share" id="share-btn" data-symbol="{{ token.symbol }}">Share</button>
+  </div>
+
+  <div class="token-right">
+    <div class="swap-panel" id="swap-panel">
+      <div class="swap-tabs">
+        <button class="swap-tab active" data-side="buy">Buy</button>
+        <button class="swap-tab" data-side="sell">Sell</button>
+      </div>
+
+      <div id="wallet-section">
+        <button id="connect-wallet-btn" class="btn-connect">Connect Wallet</button>
+        <span id="wallet-address" class="wallet-address" hidden></span>
+      </div>
+
+      <label class="swap-label">Amount
+        <input type="number" id="swap-amount" value="100" min="0" step="any">
+        <span id="swap-unit">USD</span>
+      </label>
+
+      <div class="quote-box" id="quote-box" hidden>
+        <div class="quote-row"><span>You receive</span><span id="quote-output" class="mono">—</span></div>
+        <div class="quote-row"><span>Implied price</span><span id="quote-price" class="mono">—</span></div>
+        <div class="quote-row"><span>Price impact</span><span id="quote-impact" class="mono">—</span></div>
+        <div class="quote-row"><span>Premium after fill</span><span id="quote-premium-after" class="mono">—</span></div>
+        <div class="quote-row"><span>Route</span><span id="quote-route" class="mono">—</span></div>
+        <div class="quote-row"><span>Slippage</span><span id="quote-slippage" class="mono">—</span></div>
+      </div>
+
+      <p class="swap-note" id="swap-note"></p>
+
+      <p class="swap-disclaimer">Not for US persons. Not investment advice. Economic exposure only, via an SPV.</p>
+
+      <button class="btn-confirm" id="confirm-swap-btn" disabled>Get quote</button>
+
+      <div class="swap-result" id="swap-result" hidden></div>
+
+      <a class="jup-fallback" id="jup-fallback-link" href="#" target="_blank" rel="noopener" hidden>Trade on jup.ag instead ↗</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/token.js?v={{ static_v('js/token.js') }}"></script>
+{% endblock %}

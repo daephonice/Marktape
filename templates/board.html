@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="board-wrap">
+  {% if not snapshot.tokens %}
+  <div class="empty-state">
+    <p>Board is warming up. Prices refresh every ~45s.</p>
+  </div>
+  {% else %}
+  <table class="board-table" id="board-table">
+    <thead>
+      <tr>
+        <th class="col-symbol">Name</th>
+        <th class="col-premium">Premium</th>
+        <th class="col-price">Token Price</th>
+        <th class="col-price">Mark Price</th>
+        <th class="col-val">Implied Val</th>
+        <th class="col-val">Mark Val</th>
+        <th class="col-supply">Supply</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in snapshot.tokens %}
+      <tr class="board-row" onclick="window.location.href='/t/{{ t.symbol }}'">
+        <td class="col-symbol">
+          {% if t.image %}<img class="row-logo" src="{{ t.image }}" alt="" loading="lazy">{% endif %}
+          <span class="row-symbol">{{ t.symbol }}</span>
+          <span class="row-name">{{ t.name }}</span>
+        </td>
+        <td class="col-premium status-{{ premium_status(t.premium) }}">{{ format_premium(t.premium) }}</td>
+        <td class="col-price mono">${{ "%.2f"|format(t.tokenPrice) if t.tokenPrice is not none else "—" }}</td>
+        <td class="col-price mono">${{ "%.2f"|format(t.markPrice) if t.markPrice is not none else "—" }}</td>
+        <td class="col-val mono">{{ "${:,.0f}".format(t.impliedValuation) if t.impliedValuation else "—" }}</td>
+        <td class="col-val mono">{{ "${:,.0f}".format(t.markValuation) if t.markValuation else "—" }}</td>
+        <td class="col-supply mono">{{ "{:,.0f}".format(t.supply) if t.supply else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/board.js?v={{ static_v('js/board.js') }}"></script>
+{% endblock %}

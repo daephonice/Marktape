@@ -1,1 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{% block title %}Marktape — mark vs tape for PreStocks{% endblock %}</title>
+  <meta name="description" content="Mark vs tape for PreStocks. Live board, in-page Jupiter swap, Telegram alerts.">
+  <link rel="stylesheet" href="/static/css/desk.css?v={{ static_v('css/desk.css') }}">
+  {% block styles %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="wordmark">MARKTAPE</a>
+    <div class="header-right">
+      <span class="refresh-time" id="last-refresh" data-fetched-at="{{ snapshot.fetchedAt if snapshot is defined else '' }}"></span>
+      {% if telegram_public_url %}
+      <a class="btn-alerts" href="{{ telegram_public_url }}" target="_blank" rel="noopener">Alerts → Telegram</a>
+      {% endif %}
+    </div>
+  </header>
 
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p class="disclaimer">
+      PreStocks tokens provide economic exposure only via an SPV — not shares, not an affiliation with the named
+      company. Not for US persons. Not investment advice. Marktape does not custody funds; swaps are signed in your
+      own wallet.
+    </p>
+    <p class="footer-links">
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+      {% if telegram_public_url %}
+      · Live alerts: <a href="{{ telegram_public_url }}" target="_blank" rel="noopener">{{ telegram_public_url.replace('https://t.me/', 't.me/') }}</a>
+      {% endif %}
+    </p>
+    <p class="footer-fine">Data: PreStocks API. Execution: Jupiter Ultra, signed in your wallet. Prices can be stale.</p>
+  </footer>
+
+  <script src="/static/js/wallet.js?v={{ static_v('js/wallet.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
