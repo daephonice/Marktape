@@ -226,8 +226,9 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 @keyframes fadeNum { from { opacity: 0.3; } to { opacity: 1; } }
 
 /* ==========================================================================
-   Homepage redesign — stone & ink. Scoped to body.mkt-home only.
-   Token/share pages keep the original theme above untouched.
+   Homepage redesign v2 — stone & ink desk, merged with the density of a
+   screener + card grid. Scoped to body.mkt-home only. Token/share pages
+   keep the original theme above untouched.
    ========================================================================== */
 body.mkt-home {
   background: #0E0F0C;
@@ -245,22 +246,31 @@ body.mkt-home a { color: inherit; }
   .mkt-frame { padding: 0 40px; }
 }
 @media (max-width: 640px) {
-  .mkt-frame { padding: 0 20px; }
+  .mkt-frame { padding: 0 16px; }
 }
 
-/* Header */
+/* Shared status colors (also used by stat cards / card premiums) */
+.mkt-home .status-cheap { color: #8FA08A; }
+.mkt-home .status-rich { color: #C48B84; }
+.mkt-home .status-flat { color: #6F6B61; }
+.status-cheap-stroke { stroke: #8FA08A; }
+.status-rich-stroke { stroke: #C48B84; }
+
+/* ---------------------------------------------------------------------- */
+/* Header                                                                  */
+/* ---------------------------------------------------------------------- */
 .mkt-header {
   background: #161714;
   border-bottom: 1px solid #2A2B27;
-  height: 64px;
 }
 .mkt-header-inner {
-  height: 64px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.mkt-header-left { display: flex; align-items: center; gap: 12px; }
+.mkt-brand { display: flex; align-items: center; gap: 10px; }
+.mkt-brand-mark { display: inline-flex; }
 .mkt-wordmark {
   font-family: 'Newsreader', serif;
   font-style: italic;
@@ -269,89 +279,128 @@ body.mkt-home a { color: inherit; }
   letter-spacing: 0.02em;
   color: #C4B49A;
 }
-.mkt-hairline-v { width: 1px; height: 12px; background: #2A2B27; display: inline-block; }
+.mkt-header-right { display: flex; align-items: center; gap: 16px; }
 .mkt-updated {
   font-family: 'Geist', sans-serif;
   font-size: 11px;
   letter-spacing: 0.02em;
   color: #6F6B61;
+  white-space: nowrap;
 }
 .mkt-updated.stale { color: #C48B84; }
-.mkt-alerts {
-  font-size: 12px;
+.mkt-connect-btn {
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  color: #C4B49A;
-  border-bottom: 1px solid transparent;
-  padding-bottom: 2px;
+  letter-spacing: 0.01em;
+  color: #0E0F0C;
+  background: #C4B49A;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
 }
-.mkt-alerts:hover { border-bottom-color: #2A2B27; }
+.mkt-connect-btn:hover { opacity: 0.88; }
+.mkt-connect-btn.connected {
+  background: transparent;
+  border: 1px solid #2A2B27;
+  color: #E8E4D9;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
 
 @media (max-width: 640px) {
-  .mkt-header-inner { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; height: auto; }
-  .mkt-header { height: auto; }
-  .mkt-header-left { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .mkt-hairline-v { display: none; }
+  .mkt-header-inner { height: auto; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; gap: 10px; row-gap: 8px; }
+  .mkt-updated { width: 100%; order: 3; }
+  .mkt-connect-btn { padding: 7px 12px; font-size: 12px; }
 }
 
-/* Thesis */
+/* ---------------------------------------------------------------------- */
+/* Thesis                                                                  */
+/* ---------------------------------------------------------------------- */
 .mkt-thesis {
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-size: 15px;
   color: #9A9588;
   margin: 28px 0 0;
+  max-width: 62ch;
 }
-@media (max-width: 640px) {
-  .mkt-thesis { font-size: 14px; }
-}
+@media (max-width: 640px) { .mkt-thesis { font-size: 14px; margin-top: 20px; } }
 
-/* Strip */
-.mkt-strip {
-  display: flex;
-  height: 48px;
+/* ---------------------------------------------------------------------- */
+/* Stat cards                                                              */
+/* ---------------------------------------------------------------------- */
+.mkt-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: #2A2B27;
+  border: 1px solid #2A2B27;
+  border-radius: 10px;
+  overflow: hidden;
   margin-top: 20px;
-  border-top: 1px solid #2A2B27;
-  border-bottom: 1px solid #2A2B27;
 }
-.mkt-strip-cell {
-  flex: 1;
+.mkt-stat-card {
+  background: #161714;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 0 16px;
-  border-left: 1px solid #2A2B27;
+  gap: 6px;
+  min-width: 0;
 }
-.mkt-strip-cell:first-child { border-left: none; padding-left: 0; }
-.mkt-strip-label {
+.mkt-stat-label {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #6F6B61;
   font-weight: 500;
 }
-.mkt-strip-value {
+.mkt-stat-value {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
+  font-size: 15px;
   color: #E8E4D9;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 860px) {
+  .mkt-stats { grid-template-columns: repeat(2, 1fr); border-radius: 8px; }
 }
 @media (max-width: 640px) {
-  .mkt-strip { height: auto; flex-direction: column; border-top: none; }
-  .mkt-strip-cell {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    height: 36px;
-    border-left: none;
-    border-top: 1px solid #2A2B27;
-    padding: 0;
-  }
+  .mkt-stat-card { padding: 12px; }
+  .mkt-stat-value { font-size: 13px; }
 }
 
-/* Tape */
-.mkt-tape { margin-top: 28px; }
+/* ---------------------------------------------------------------------- */
+/* Search                                                                  */
+/* ---------------------------------------------------------------------- */
+.mkt-search-wrap {
+  position: relative;
+  margin-top: 24px;
+}
+.mkt-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.mkt-search-input {
+  width: 100%;
+  background: #161714;
+  border: 1px solid #2A2B27;
+  border-radius: 8px;
+  padding: 11px 14px 11px 38px;
+  color: #E8E4D9;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.mkt-search-input::placeholder { color: #6F6B61; }
+.mkt-search-input:focus { border-color: #C4B49A; }
+
+/* ---------------------------------------------------------------------- */
+/* Card grid — 2 per row, tall rectangular, casino-game-card proportions   */
+/* ---------------------------------------------------------------------- */
 .mkt-empty {
   font-family: 'Newsreader', serif;
   font-style: italic;
@@ -359,107 +408,109 @@ body.mkt-home a { color: inherit; }
   color: #9A9588;
   margin-top: 40px;
 }
-.mkt-tape-head {
+.mkt-cards {
   display: grid;
-  grid-template-columns: 36px 220px 108px 120px 120px 1fr;
-  gap: 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #2A2B27;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+  padding-bottom: 64px;
 }
-.mkt-tape-head span {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #6F6B61;
+.mkt-card {
+  background: #161714;
+  border: 1px solid #2A2B27;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
-.mkt-tape-head .col-premium,
-.mkt-tape-head .col-tape,
-.mkt-tape-head .col-mark,
-.mkt-tape-head .col-implied { text-align: right; }
+@media (hover: hover) {
+  .mkt-card:hover { border-color: #C4B49A; transform: translateY(-2px); }
+}
+.mkt-card[hidden] { display: none; }
 
-.mkt-row {
-  display: grid;
-  grid-template-columns: 36px 220px 108px 120px 120px 1fr;
-  align-items: center;
-  height: 56px;
-  border-bottom: 1px solid #2A2B27;
-  cursor: pointer;
-}
-.mkt-row:hover { background: #1C1D1A; }
-.mkt-row:hover .mkt-ticker { color: #FFFFFF; }
-
-.mkt-logo { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(232,228,217,0.15); object-fit: cover; }
+.mkt-card-top { display: flex; align-items: flex-start; gap: 10px; }
+.mkt-card-logo { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(232,228,217,0.15); object-fit: cover; flex-shrink: 0; }
 .mkt-logo-empty { background: #1C1D1A; display: inline-block; }
-
-.mkt-name { display: flex; flex-direction: column; gap: 2px; }
-.mkt-ticker { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; color: #E8E4D9; }
-.mkt-fullname { font-size: 12px; color: #9A9588; }
-
-.mkt-premium {
+.mkt-card-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.mkt-card-ticker { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500; letter-spacing: 0.03em; color: #E8E4D9; }
+.mkt-card-name { font-size: 11px; color: #9A9588; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mkt-card-premium {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
-  text-align: right;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  padding-top: 2px;
 }
-.mkt-tape-price, .mkt-mark-price {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.mkt-tape-price { color: #E8E4D9; }
-.mkt-mark-price { color: #9A9588; }
-.mkt-implied {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  text-align: right;
-  color: #9A9588;
-  font-variant-numeric: tabular-nums;
-}
-.mkt-mobile-line { display: none; }
 
-.mkt-row.fade-refresh .mkt-premium,
-.mkt-row.fade-refresh .mkt-tape-price,
-.mkt-row.fade-refresh .mkt-mark-price { animation: fadeNum 160ms ease; }
+.mkt-card-prices { display: flex; gap: 20px; }
+.mkt-card-price-cell { display: flex; flex-direction: column; gap: 3px; }
+.mkt-card-price-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #6F6B61; font-weight: 500; }
+.mkt-card-price-value { font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #E8E4D9; font-variant-numeric: tabular-nums; }
+.mkt-card-price-muted { color: #9A9588; }
 
-/* Mobile tape */
+.mkt-card-chart { height: 56px; }
+.mkt-sparkline { width: 100%; height: 100%; display: block; }
+.mkt-sparkline-mid { stroke: #2A2B27; stroke-width: 1; }
+.mkt-sparkline-line { }
+
+.mkt-trade-btn {
+  display: block;
+  text-align: center;
+  background: #C4B49A;
+  color: #0E0F0C;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 11px;
+  border-radius: 7px;
+  margin-top: auto;
+  transition: opacity 0.15s ease;
+}
+.mkt-trade-btn:hover { opacity: 0.88; }
+
+.mkt-card.fade-refresh { animation: fadeNum 200ms ease; }
+
 @media (max-width: 640px) {
-  .mkt-tape-head { display: none; }
-  .mkt-row {
-    grid-template-columns: 28px 1fr auto;
-    grid-template-rows: auto auto;
-    height: auto;
-    min-height: 72px;
-    padding: 12px 0;
-    row-gap: 4px;
-    column-gap: 10px;
-  }
-  .mkt-logo { grid-row: 1 / 2; }
-  .mkt-name { grid-row: 1 / 2; flex-direction: row; align-items: baseline; gap: 8px; }
-  .mkt-fullname { display: none; }
-  .mkt-premium { grid-row: 1 / 2; font-size: 15px; }
-  .mkt-tape-price, .mkt-mark-price, .mkt-implied { display: none; }
-  .mkt-mobile-line {
-    display: block;
-    grid-column: 2 / 4;
-    grid-row: 2 / 3;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    color: #9A9588;
-    font-variant-numeric: tabular-nums;
-  }
+  .mkt-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 18px; }
+  .mkt-card { padding: 12px; gap: 10px; border-radius: 10px; }
+  .mkt-card-logo { width: 26px; height: 26px; border-radius: 6px; }
+  .mkt-card-ticker { font-size: 12px; }
+  .mkt-card-name { font-size: 10px; }
+  .mkt-card-premium { font-size: 13px; }
+  .mkt-card-prices { gap: 12px; }
+  .mkt-card-price-value { font-size: 12px; }
+  .mkt-card-chart { height: 40px; }
+  .mkt-trade-btn { padding: 9px; font-size: 11px; }
+}
+@media (max-width: 380px) {
+  .mkt-cards { grid-template-columns: 1fr; }
 }
 
-/* Footer */
-.mkt-footer { margin-top: 64px; border-top: 1px solid #2A2B27; padding: 24px 0 40px; }
-.mkt-footer-links { font-size: 12px; color: #9A9588; }
-.mkt-footer-links a:hover { color: #C4B49A; }
-.mkt-footer-links .dot { margin: 0 8px; color: #6F6B61; }
+/* ---------------------------------------------------------------------- */
+/* Footer                                                                  */
+/* ---------------------------------------------------------------------- */
+.mkt-footer { border-top: 1px solid #2A2B27; padding: 28px 0 40px; }
+.mkt-footer-inner { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.mkt-footer-icons { display: flex; align-items: center; gap: 18px; }
+.mkt-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #2A2B27;
+  color: #9A9588;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.mkt-icon-link:hover { color: #C4B49A; border-color: #C4B49A; }
+.mkt-icon-link-text { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; }
 .mkt-legal {
-  margin-top: 16px;
-  max-width: 560px;
+  max-width: 480px;
   font-size: 11px;
   line-height: 17px;
   color: #6F6B61;
