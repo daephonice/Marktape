@@ -29,12 +29,20 @@ def _strip_facts(tokens: list, stats: dict | None = None) -> dict:
     priced = [t for t in tokens if t.get("premium") is not None]
     avg_premium = sum(t["premium"] for t in priced) / len(priced) if priced else None
     stats = stats or {}
+
+    def _num(v):
+        if isinstance(v, (int, float)):
+            return v
+        if isinstance(v, (list, tuple)) and v and isinstance(v[-1], (int, float)):
+            return v[-1]
+        return None
+
     return {
         "count": len(tokens),
         "avg_premium": avg_premium,
-        "volume_24h": stats.get("volume24h") or stats.get("volume_24h"),
-        "liquidity": stats.get("liquidity"),
-        "holders": stats.get("holders"),
+        "volume_24h": _num(stats.get("volume24h") or stats.get("volume_24h")),
+        "liquidity": _num(stats.get("liquidity")),
+        "holders": _num(stats.get("holders")),
     }
 
 
