@@ -25,27 +25,25 @@ templates.env.globals["format_premium"] = prestocks.format_premium
 templates.env.globals["premium_status"] = prestocks.premium_status
 
 
-def _strip_facts(tokens: list) -> dict:
+def _strip_facts(tokens: list, stats: dict | None = None) -> dict:
     priced = [t for t in tokens if t.get("premium") is not None]
-    valued = [t for t in tokens if t.get("markValuation")]
-    cheapest = min(priced, key=lambda t: t["premium"]) if priced else None
-    richest = max(priced, key=lambda t: t["premium"]) if priced else None
     avg_premium = sum(t["premium"] for t in priced) / len(priced) if priced else None
-    combined_mark_val = sum(t["markValuation"] for t in valued) if valued else None
+    stats = stats or {}
     return {
-        "cheapest": cheapest if cheapest and cheapest["premium"] < 0 else None,
-        "richest": richest if richest and richest["premium"] > 0 else None,
         "count": len(tokens),
         "avg_premium": avg_premium,
-        "combined_mark_val": combined_mark_val,
+        "volume_24h": stats.get("volume24h") or stats.get("volume_24h"),
+        "liquidity": stats.get("liquidity"),
+        "holders": stats.get("holders"),
     }
 
 
 @router.get("/", response_class=HTMLResponse)
 async def board_page(request: Request):
     snap = prestocks.get_cached_snapshot()
+    stats = await prestocks.fetch_prestocks_stats()
     return templates.TemplateResponse(
-        request, "board.html", {"snapshot": snap, "strip": _strip_facts(snap.get("tokens", []))}
+        request, "board.html", {"snapshot": snap, "strip": _strip_facts(snap.get("tokens", []), stats)}
     )
 
 
