@@ -21,11 +21,6 @@
     return '$' + Number(v).toFixed(2);
   }
 
-  function moneyBig(v) {
-    if (!v) return '—';
-    return '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
-  }
-
   function renderTimeAgo(iso) {
     const el = document.getElementById('last-refresh');
     if (!el || !iso) return;
@@ -35,40 +30,84 @@
     el.classList.toggle('stale', secs > STALE_SECONDS);
   }
 
-  function buildRow(t) {
-    const a = document.createElement('a');
-    a.className = 'mkt-row fade-refresh';
-    a.href = `/t/${t.symbol}`;
-    a.innerHTML = `
-      ${t.image ? `<img class="mkt-logo" src="${t.image}" alt="" loading="lazy">` : '<span class="mkt-logo mkt-logo-empty"></span>'}
-      <span class="mkt-name">
-        <span class="mkt-ticker">${t.symbol}</span>
-        <span class="mkt-fullname">${t.name || ''}</span>
-      </span>
-      <span class="mkt-premium ${statusClass(t.premium)}">${fmtPremium(t.premium)}</span>
-      <span class="mkt-tape-price">${money(t.tokenPrice)}</span>
-      <span class="mkt-mark-price">${money(t.markPrice)}</span>
-      <span class="mkt-implied">${moneyBig(t.impliedValuation)}</span>
-      <span class="mkt-mobile-line">${money(t.tokenPrice)} tape · ${money(t.markPrice)} mark</span>
-    `;
-    return a;
+  // ---- Sparklines --------------------------------------------------------
+  function buildPolyline(points, rich) {
+    if (!points || points.length < 2) return '';
+    const w = 300, h = 72, pad = 6;
+    const min = Math.min(...points), max = Math.max(...points);
+    const range = max - min || 1;
+    const step = (w - pad * 2) / (points.length - 1);
+    const coords = points.map((p, i) => {
+      const x = pad + i * step;
+      const y = h - pad - ((p - min) / range) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return coords.join(' ');
   }
 
-  function updateStrip(tokens) {
-    const priced = tokens.filter((t) => t.premium !== null && t.premium !== undefined);
-    const cheapestEl = document.querySelector('#mkt-strip-cheapest .mkt-strip-value');
-    const richestEl = document.querySelector('#mkt-strip-richest .mkt-strip-value');
-    const countEl = document.querySelector('#mkt-strip-count .mkt-strip-label');
-    if (countEl) countEl.textContent = `${tokens.length} Names`;
-    if (!priced.length) return;
-    const cheapest = priced.reduce((a, b) => (a.premium < b.premium ? a : b));
-    const richest = priced.reduce((a, b) => (a.premium > b.premium ? a : b));
-    if (cheapestEl && cheapest.premium < 0) {
-      cheapestEl.innerHTML = `${cheapest.symbol} <span class="status-cheap">${fmtPremium(cheapest.premium)}</span>`;
+  async function loadSparkline(svg) {
+    const symbol = svg.dataset.symbol;
+    try {
+      const resp = await fetch(`/api/sparkline/${symbol}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const pts = data.points || [];
+      if (pts.length < 2) return;
+      const rich = pts[pts.length - 1] >= pts[0];
+      const poly = buildPolyline(pts, rich);
+      if (!poly) return;
+      const existing = svg.querySelector('.mkt-sparkline-line');
+      if (existing) existing.remove();
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      el.setAttribute('points', poly);
+      el.setAttribute('class', `mkt-sparkline-line ${rich ? 'status-rich-stroke' : 'status-cheap-stroke'}`);
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke-width', '1.6');
+      el.setAttribute('stroke-linecap', 'round');
+      el.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(el);
+    } catch (err) {
+      console.warn('sparkline failed for', symbol, err);
     }
-    if (richestEl && richest.premium > 0) {
-      richestEl.innerHTML = `${richest.symbol} <span class="status-rich">${fmtPremium(richest.premium)}</span>`;
-    }
+  }
+
+  function loadAllSparklines() {
+    document.querySelectorAll('.mkt-sparkline').forEach(loadSparkline);
+  }
+
+  // ---- Cards --------------------------------------------------------------
+  function buildCard(t) {
+    const div = document.createElement('div');
+    div.className = 'mkt-card fade-refresh';
+    div.dataset.symbol = t.symbol;
+    div.dataset.name = (t.name || '').toLowerCase();
+    div.innerHTML = `
+      <div class="mkt-card-top">
+        ${t.image ? `<img class="mkt-card-logo" src="${t.image}" alt="" loading="lazy">` : '<span class="mkt-card-logo mkt-logo-empty"></span>'}
+        <div class="mkt-card-heading">
+          <span class="mkt-card-ticker">${t.symbol}</span>
+          <span class="mkt-card-name">${t.name || ''}</span>
+        </div>
+        <span class="mkt-card-premium ${statusClass(t.premium)}">${fmtPremium(t.premium)}</span>
+      </div>
+      <div class="mkt-card-prices">
+        <div class="mkt-card-price-cell">
+          <span class="mkt-card-price-label">Tape</span>
+          <span class="mkt-card-price-value">${money(t.tokenPrice)}</span>
+        </div>
+        <div class="mkt-card-price-cell mkt-card-price-cell-mark">
+          <span class="mkt-card-price-label">Mark</span>
+          <span class="mkt-card-price-value mkt-card-price-muted">${money(t.markPrice)}</span>
+        </div>
+      </div>
+      <div class="mkt-card-chart">
+        <svg class="mkt-sparkline" data-symbol="${t.symbol}" viewBox="0 0 300 72" preserveAspectRatio="none">
+          <line x1="0" y1="36" x2="300" y2="36" class="mkt-sparkline-mid"></line>
+        </svg>
+      </div>
+      <a href="/t/${t.symbol}" class="mkt-trade-btn">Trade ${t.symbol}</a>
+    `;
+    return div;
   }
 
   async function refreshBoard() {
@@ -76,11 +115,13 @@
       const resp = await fetch('/api/board');
       if (!resp.ok) return;
       const snap = await resp.json();
-      const body = document.getElementById('mkt-tape-body');
-      if (body && snap.tokens) {
-        body.innerHTML = '';
-        snap.tokens.forEach((t) => body.appendChild(buildRow(t)));
-        updateStrip(snap.tokens);
+      const grid = document.getElementById('mkt-cards');
+      if (grid && snap.tokens) {
+        const query = (document.getElementById('mkt-search') || {}).value || '';
+        grid.innerHTML = '';
+        snap.tokens.forEach((t) => grid.appendChild(buildCard(t)));
+        applySearch(query);
+        loadAllSparklines();
       }
       if (snap.fetchedAt) {
         document.getElementById('last-refresh').dataset.fetchedAt = snap.fetchedAt;
@@ -89,6 +130,37 @@
     } catch (err) {
       console.warn('board refresh failed', err);
     }
+  }
+
+  // ---- Search ---------------------------------------------------------
+  function applySearch(rawQuery) {
+    const query = (rawQuery || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('.mkt-card');
+    let visible = 0;
+    cards.forEach((card) => {
+      const match = !query || card.dataset.symbol.toLowerCase().includes(query) || card.dataset.name.includes(query);
+      card.hidden = !match;
+      if (match) visible += 1;
+    });
+    const noResults = document.getElementById('mkt-no-results');
+    if (noResults) noResults.hidden = visible !== 0 || cards.length === 0;
+  }
+
+  const searchInput = document.getElementById('mkt-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => applySearch(e.target.value));
+  }
+
+  // ---- Wallet connect button in header ---------------------------------
+  const connectBtn = document.getElementById('mkt-connect-btn');
+  if (connectBtn) {
+    connectBtn.addEventListener('click', async () => {
+      if (!window.MarktapeWallet) return;
+      const pubkey = await window.MarktapeWallet.connectWallet();
+      if (!pubkey) return;
+      connectBtn.textContent = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
+      connectBtn.classList.add('connected');
+    });
   }
 
   setInterval(() => {
@@ -100,4 +172,6 @@
 
   const initialEl = document.getElementById('last-refresh');
   if (initialEl && initialEl.dataset.fetchedAt) renderTimeAgo(initialEl.dataset.fetchedAt);
+
+  loadAllSparklines();
 })();
