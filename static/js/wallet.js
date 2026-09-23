@@ -16,6 +16,35 @@
 (function () {
   const SOLANA_CHAINS = ['solana:mainnet', 'solana:devnet', 'solana:testnet'];
   const discovered = new Map(); // wallet name -> standard Wallet object
+  const STORAGE_KEY = 'mkt_wallet'; // remembered wallet so a page reload re-connects silently
+
+  function emit(address) {
+    window.dispatchEvent(new CustomEvent('marktape:wallet', { detail: { address } }));
+  }
+
+  function remember(state) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kind: state.kind, name: state.wallet ? state.wallet.name : null }));
+    } catch (_) {}
+  }
+
+  function forget() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+  }
+
+  function getAddress() {
+    const s = window.__marktapeWallet;
+    if (!s) return null;
+    return s.kind === 'standard' ? s.account.address : s.pubkey;
+  }
+
+  function setConnected(state) {
+    window.__marktapeWallet = state;
+    remember(state);
+    const address = getAddress();
+    emit(address);
+    return address;
+  }
 
   function isSolanaWallet(wallet) {
     return Array.isArray(wallet.chains) && wallet.chains.some((c) => c.startsWith('solana:'));
@@ -89,23 +118,61 @@
     return connectAny();
   }
 
-  async function connectStandardWallet(wallet) {
+  async function connectStandardWallet(wallet, silent) {
     const connectFeature = wallet.features && wallet.features['standard:connect'];
     if (!connectFeature) throw new Error(`${wallet.name} does not support standard:connect`);
-    const { accounts } = await connectFeature.connect();
+    const { accounts } = await connectFeature.connect(silent ? { silent: true } : undefined);
     const account = (accounts || [])[0];
     if (!account) throw new Error(`${wallet.name} returned no account`);
-    window.__marktapeWallet = { kind: 'standard', wallet, account };
-    return account.address;
+    return setConnected({ kind: 'standard', wallet, account });
   }
 
-  async function connectLegacy() {
+  async function connectLegacy(silent) {
     const provider = getLegacyProvider();
     if (!provider) return null;
-    const resp = await provider.connect();
+    const resp = await provider.connect(silent ? { onlyIfTrusted: true } : undefined);
     const pubkey = (resp && resp.publicKey ? resp.publicKey : provider.publicKey).toString();
-    window.__marktapeWallet = { kind: 'legacy', provider, pubkey };
-    return pubkey;
+    return setConnected({ kind: 'legacy', provider, pubkey });
+  }
+
+  /* Silent re-connect on page load using the wallet remembered from the last
+   * successful connect. Never opens a popup; if the wallet no longer trusts
+   * this site the memory is dropped. Wallets can register a beat after page
+   * load, so retry briefly before giving up. */
+  async function autoConnect() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (_) {}
+    if (!saved) return null;
+    for (let i = 0; i < 8; i++) {
+      try {
+        if (saved.kind === 'standard') {
+          const wallet = discovered.get(saved.name);
+          if (wallet) return await connectStandardWallet(wallet, true);
+        } else if (getLegacyProvider()) {
+          return await connectLegacy(true);
+        }
+      } catch (err) {
+        forget();
+        return null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    return null;
+  }
+
+  async function disconnect() {
+    const state = window.__marktapeWallet;
+    try {
+      if (state && state.kind === 'standard') {
+        const feature = state.wallet.features['standard:disconnect'];
+        if (feature) await feature.disconnect();
+      } else if (state && state.provider && state.provider.disconnect) {
+        await state.provider.disconnect();
+      }
+    } catch (_) {}
+    window.__marktapeWallet = null;
+    forget();
+    emit(null);
   }
 
   /* Connects to the single available wallet directly; if more than one is
@@ -171,15 +238,15 @@
     const style = document.createElement('style');
     style.id = 'mkt-wallet-picker-styles';
     style.textContent = `
-      .mkt-wallet-picker-overlay { position: fixed; inset: 0; background: rgba(14,15,12,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-      .mkt-wallet-picker { background: #161714; border: 1px solid #2A2B27; border-radius: 12px; padding: 16px; width: min(320px, 88vw); display: flex; flex-direction: column; gap: 8px; }
-      .mkt-wallet-picker-title { font-family: 'Geist', sans-serif; font-size: 13px; color: #9A9588; margin-bottom: 4px; }
-      .mkt-wallet-picker-item { display: flex; align-items: center; gap: 10px; background: #0E0F0C; border: 1px solid #2A2B27; border-radius: 8px; padding: 10px 12px; color: #E8E4D9; font-family: 'Geist', sans-serif; font-size: 13px; cursor: pointer; text-align: left; }
-      .mkt-wallet-picker-item:hover { border-color: #C4B49A; }
+      .mkt-wallet-picker-overlay { position: fixed; inset: 0; background: rgba(11,17,24,0.72); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+      .mkt-wallet-picker { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: min(320px, 88vw); display: flex; flex-direction: column; gap: 8px; }
+      .mkt-wallet-picker-title { font-family: 'Geist', sans-serif; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+      .mkt-wallet-picker-item { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-family: 'Geist', sans-serif; font-size: 13px; cursor: pointer; text-align: left; }
+      .mkt-wallet-picker-item:hover { border-color: var(--accent); }
       .mkt-wallet-picker-icon { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-      .mkt-wallet-picker-icon-empty { background: #1C1D1A; display: inline-block; }
-      .mkt-wallet-picker-cancel { margin-top: 4px; background: transparent; border: none; color: #6F6B61; font-family: 'Geist', sans-serif; font-size: 12px; cursor: pointer; padding: 6px; }
-      .mkt-wallet-picker-cancel:hover { color: #E8E4D9; }
+      .mkt-wallet-picker-icon-empty { background: var(--surface-2); display: inline-block; }
+      .mkt-wallet-picker-cancel { margin-top: 4px; background: transparent; border: none; color: var(--dim); font-family: 'Geist', sans-serif; font-size: 12px; cursor: pointer; padding: 6px; }
+      .mkt-wallet-picker-cancel:hover { color: var(--text); }
     `;
     document.head.appendChild(style);
   }
@@ -270,6 +337,35 @@
     connectByName,
     listAvailableWallets,
     signTransactionBase64,
+    getAddress,
+    disconnect,
     getProvider: getLegacyProvider, // kept for back-compat with older callers
   };
+
+  // ---- Header connect button: one place, every page --------------------
+  (function initHeaderButton() {
+    const btn = document.getElementById('mkt-connect-btn');
+    if (!btn) return;
+    const idleLabel = btn.textContent;
+    function paint(address) {
+      if (address) {
+        btn.textContent = `${address.slice(0, 4)}…${address.slice(-4)}`;
+        btn.classList.add('connected');
+      } else {
+        btn.textContent = idleLabel;
+        btn.classList.remove('connected');
+      }
+    }
+    window.addEventListener('marktape:wallet', (e) => paint(e.detail.address));
+    btn.addEventListener('click', async () => {
+      if (getAddress()) {
+        if (window.confirm('Disconnect wallet?')) await disconnect();
+        return;
+      }
+      await connectWithPicker();
+    });
+    paint(getAddress());
+  })();
+
+  autoConnect();
 })();

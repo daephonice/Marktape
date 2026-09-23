@@ -29,7 +29,6 @@
   const connectBtn = document.getElementById('connect-wallet-btn');
   const walletSection = document.getElementById('wallet-section');
   const walletAddrEl = document.getElementById('wallet-address');
-  const headerConnectBtn = document.getElementById('mkt-connect-btn');
 
   // ---- Side toggle -------------------------------------------------------
   function setSide(newSide) {
@@ -143,33 +142,37 @@
   }, QUOTE_REFRESH_MS);
 
   // ---- Wallet ---------------------------------------------------------
+  // Connection state lives in wallet.js (persisted across pages); we just react to it.
   function onWalletConnected(pubkey) {
+    if (wallet === pubkey) return;
     wallet = pubkey;
-    const short = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
-    walletAddrEl.textContent = short;
+    walletAddrEl.textContent = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
     walletAddrEl.hidden = false;
     connectBtn.hidden = true;
-    if (headerConnectBtn) {
-      headerConnectBtn.textContent = short;
-      headerConnectBtn.classList.add('connected');
-    }
     fetchQuote();
   }
 
-  connectBtn.addEventListener('click', async () => {
-    if (!window.MarktapeWallet) return;
-    const pubkey = await window.MarktapeWallet.connectWithPicker();
-    if (!pubkey) return;
-    onWalletConnected(pubkey);
+  function onWalletDisconnected() {
+    wallet = null;
+    lastQuote = null;
+    walletAddrEl.hidden = true;
+    connectBtn.hidden = false;
+    quoteBox.hidden = true;
+    confirmBtn.hidden = true;
+    confirmBtn.disabled = true;
+  }
+
+  window.addEventListener('marktape:wallet', (e) => {
+    if (e.detail.address) onWalletConnected(e.detail.address);
+    else onWalletDisconnected();
   });
 
-  if (headerConnectBtn) {
-    headerConnectBtn.addEventListener('click', async () => {
-      if (!window.MarktapeWallet) return;
-      const pubkey = await window.MarktapeWallet.connectWithPicker();
-      if (!pubkey) return;
-      onWalletConnected(pubkey);
-    });
+  connectBtn.addEventListener('click', () => {
+    if (window.MarktapeWallet) window.MarktapeWallet.connectWithPicker();
+  });
+
+  if (window.MarktapeWallet && window.MarktapeWallet.getAddress()) {
+    onWalletConnected(window.MarktapeWallet.getAddress());
   }
 
   confirmBtn.addEventListener('click', async () => {
@@ -254,8 +257,8 @@
     });
     const lineD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(' ');
     const up = points[points.length - 1] >= points[0];
-    const stroke = '#C9B89A';
-    const fillColor = up ? '#8FA08A' : '#C48B84';
+    const stroke = '#1475E1';
+    const fillColor = up ? '#22C55E' : '#EF4444';
 
     const fillD = `${lineD} L${coords[coords.length - 1][0].toFixed(1)},${h - pad} L${coords[0][0].toFixed(1)},${h - pad} Z`;
 

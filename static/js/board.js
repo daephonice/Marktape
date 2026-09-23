@@ -128,19 +128,40 @@
     searchInput.addEventListener('input', (e) => applySearch(e.target.value));
   }
 
-  // ---- Wallet connect button in header ---------------------------------
-  const connectBtn = document.getElementById('mkt-connect-btn');
-  if (connectBtn) {
-    connectBtn.addEventListener('click', async () => {
-      if (!window.MarktapeWallet) return;
-      const pubkey = await window.MarktapeWallet.connectWithPicker();
-      if (!pubkey) return;
-      connectBtn.textContent = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
-      connectBtn.classList.add('connected');
-    });
+  // ---- Stat strip (AUM / Volume / Holders / Txns) -------------------------
+  function fmtCompact(v, prefix) {
+    if (v === null || v === undefined || !isFinite(v)) return null;
+    const n = Number(v);
+    const units = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+    for (const [div, suffix] of units) {
+      if (Math.abs(n) >= div) {
+        return prefix + (n / div).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + suffix;
+      }
+    }
+    return prefix + Math.round(n).toLocaleString('en-US');
   }
 
-  setInterval(refreshBoard, REFRESH_MS);
+  function setStat(key, text) {
+    if (text === null) return; // keep the last good value on screen
+    const el = document.querySelector(`[data-stat="${key}"] .mkt-stat-value`);
+    if (el && el.textContent !== text) el.textContent = text;
+  }
+
+  async function refreshStats() {
+    try {
+      const resp = await fetch('/api/market-stats');
+      if (!resp.ok) return;
+      const s = await resp.json();
+      setStat('aum', fmtCompact(s.aum, '$'));
+      setStat('volume', fmtCompact(s.volume, '$'));
+      setStat('holders', fmtCompact(s.holders, ''));
+      setStat('txns', fmtCompact(s.txns, ''));
+    } catch (err) {
+      console.warn('stats refresh failed', err);
+    }
+  }
+
+  setInterval(() => { refreshBoard(); refreshStats(); }, REFRESH_MS);
 
   loadAllSparklines();
 })();
