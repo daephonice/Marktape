@@ -226,78 +226,75 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 @keyframes fadeNum { from { opacity: 0.3; } to { opacity: 1; } }
 
 /* ==========================================================================
-   Homepage redesign v2 — stone & ink desk, merged with the density of a
-   screener + card grid. Scoped to body.mkt-home only. Token/share pages
-   keep the original theme above untouched.
+   Homepage redesign v3 — Marktape lobby. Dark warm bone-on-charcoal, PreStocks
+   lobby of 8 casino-shaped cards. Scoped to body.mkt-home only. Token/share
+   pages keep the original theme above untouched.
    ========================================================================== */
 body.mkt-home {
-  background: #0E0F0C;
-  color: #E8E4D9;
+  background: #0C0D0B;
+  color: #E7E2D6;
   font-family: 'Geist', -apple-system, sans-serif;
 }
 body.mkt-home a { color: inherit; }
 
 .mkt-frame {
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 20px;
 }
 @media (min-width: 1024px) {
   .mkt-frame { padding: 0 40px; }
 }
-@media (max-width: 640px) {
-  .mkt-frame { padding: 0 16px; }
-}
 
-/* Shared status colors (also used by stat cards / card premiums) */
+/* Shared status colors */
 .mkt-home .status-cheap { color: #8FA08A; }
 .mkt-home .status-rich { color: #C48B84; }
-.mkt-home .status-flat { color: #6F6B61; }
+.mkt-home .status-flat { color: #6E6A60; }
 .status-cheap-stroke { stroke: #8FA08A; }
 .status-rich-stroke { stroke: #C48B84; }
+.status-flat-stroke { stroke: #26271F; }
+.status-pill-cheap { color: #8FA08A; background: rgba(143,160,138,0.12); }
+.status-pill-rich { color: #C48B84; background: rgba(196,139,132,0.12); }
+.status-pill-flat { color: #6E6A60; background: rgba(110,106,96,0.12); }
 
 /* ---------------------------------------------------------------------- */
 /* Header                                                                  */
 /* ---------------------------------------------------------------------- */
 .mkt-header {
-  background: #161714;
-  border-bottom: 1px solid #2A2B27;
+  background: #141512;
+  border-bottom: 1px solid #26271F;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 .mkt-header-inner {
-  height: 68px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.mkt-brand { display: flex; align-items: center; gap: 10px; }
+@media (min-width: 1024px) { .mkt-header-inner { height: 64px; } }
+.mkt-brand { display: flex; align-items: center; gap: 8px; }
 .mkt-brand-mark { display: inline-flex; }
 .mkt-wordmark {
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-weight: 400;
-  font-size: 22px;
-  letter-spacing: 0.02em;
-  color: #C4B49A;
+  font-size: 20px;
+  color: #C9B89A;
 }
+@media (min-width: 1024px) { .mkt-wordmark { font-size: 22px; } }
 .mkt-header-right { display: flex; align-items: center; gap: 16px; }
-.mkt-updated {
-  font-family: 'Geist', sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: #6F6B61;
-  white-space: nowrap;
-}
-.mkt-updated.stale { color: #C48B84; }
 .mkt-connect-btn {
   font-family: 'Geist', sans-serif;
   font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: #0E0F0C;
-  background: #C4B49A;
+  font-weight: 600;
+  color: #0C0D0B;
+  background: #C9B89A;
   border: none;
-  border-radius: 7px;
-  padding: 9px 16px;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 14px;
   cursor: pointer;
   white-space: nowrap;
   transition: opacity 0.15s ease;
@@ -305,16 +302,20 @@ body.mkt-home a { color: inherit; }
 .mkt-connect-btn:hover { opacity: 0.88; }
 .mkt-connect-btn.connected {
   background: transparent;
-  border: 1px solid #2A2B27;
-  color: #E8E4D9;
+  border: none;
+  color: #E7E2D6;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
 }
-
-@media (max-width: 640px) {
-  .mkt-header-inner { height: auto; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; gap: 10px; row-gap: 8px; }
-  .mkt-updated { width: 100%; order: 3; }
-  .mkt-connect-btn { padding: 7px 12px; font-size: 12px; }
+.mkt-connect-btn.connected::before {
+  content: '';
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #8FA08A;
+  display: inline-block;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -323,29 +324,28 @@ body.mkt-home a { color: inherit; }
 .mkt-thesis {
   font-family: 'Newsreader', serif;
   font-style: italic;
-  font-size: 15px;
-  color: #9A9588;
-  margin: 28px 0 0;
-  max-width: 62ch;
+  font-size: 14px;
+  color: #9B968A;
+  margin: 20px 0 0;
 }
-@media (max-width: 640px) { .mkt-thesis { font-size: 14px; margin-top: 20px; } }
 
 /* ---------------------------------------------------------------------- */
-/* Stat cards                                                              */
+/* Stat chips                                                              */
 /* ---------------------------------------------------------------------- */
 .mkt-stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
-  background: #2A2B27;
-  border: 1px solid #2A2B27;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-top: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+@media (min-width: 1024px) {
+  .mkt-stats { grid-template-columns: repeat(4, 1fr); }
 }
 .mkt-stat-card {
-  background: #161714;
-  padding: 14px 16px;
+  background: #1A1B18;
+  border: 1px solid #26271F;
+  border-radius: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -353,120 +353,114 @@ body.mkt-home a { color: inherit; }
 }
 .mkt-stat-label {
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #6F6B61;
+  color: #6E6A60;
   font-weight: 500;
 }
 .mkt-stat-value {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 15px;
-  color: #E8E4D9;
+  font-size: 18px;
+  color: #E7E2D6;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-@media (max-width: 860px) {
-  .mkt-stats { grid-template-columns: repeat(2, 1fr); border-radius: 8px; }
-}
-@media (max-width: 640px) {
-  .mkt-stat-card { padding: 12px; }
-  .mkt-stat-value { font-size: 13px; }
-}
+@media (min-width: 1024px) { .mkt-stat-value { font-size: 20px; } }
 
 /* ---------------------------------------------------------------------- */
 /* Search                                                                  */
 /* ---------------------------------------------------------------------- */
 .mkt-search-wrap {
   position: relative;
-  margin-top: 24px;
+  margin-top: 10px;
 }
 .mkt-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .mkt-search-input {
   width: 100%;
-  background: #161714;
-  border: 1px solid #2A2B27;
-  border-radius: 8px;
-  padding: 11px 14px 11px 38px;
-  color: #E8E4D9;
+  height: 44px;
+  background: #1A1B18;
+  border: 1px solid #26271F;
+  border-radius: 10px;
+  padding: 0 14px 0 38px;
+  color: #E7E2D6;
   font-family: 'Geist', sans-serif;
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s ease;
 }
-.mkt-search-input::placeholder { color: #6F6B61; }
-.mkt-search-input:focus { border-color: #C4B49A; }
+.mkt-search-input::placeholder { color: #6E6A60; }
+.mkt-search-input:focus { border-color: #C9B89A; }
 
 /* ---------------------------------------------------------------------- */
-/* Card grid — 2 per row, tall rectangular, casino-game-card proportions   */
+/* Card grid — 2/row phone, 4/row desktop, portrait casino-tile shape      */
 /* ---------------------------------------------------------------------- */
 .mkt-empty {
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-size: 15px;
-  color: #9A9588;
+  color: #9B968A;
   margin-top: 40px;
 }
 .mkt-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-top: 24px;
-  padding-bottom: 64px;
+  gap: 10px;
+  margin-top: 20px;
+  padding-bottom: 48px;
+}
+@media (min-width: 1024px) {
+  .mkt-cards { grid-template-columns: repeat(4, 1fr); gap: 14px; }
 }
 .mkt-card {
-  background: #161714;
-  border: 1px solid #2A2B27;
-  border-radius: 12px;
-  padding: 18px;
+  background: #1A1B18;
+  border: 1px solid #26271F;
+  border-radius: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  height: 212px;
+  transition: border-color 0.15s ease;
 }
+@media (min-width: 1024px) { .mkt-card { height: 228px; } }
 @media (hover: hover) {
-  .mkt-card:hover { border-color: #C4B49A; transform: translateY(-2px); }
+  .mkt-card:hover { border-color: rgba(201,184,154,0.4); }
 }
 .mkt-card[hidden] { display: none; }
 
-.mkt-card-top { display: flex; align-items: flex-start; gap: 10px; }
-.mkt-card-logo { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(232,228,217,0.15); object-fit: cover; flex-shrink: 0; }
-.mkt-logo-empty { background: #1C1D1A; display: inline-block; }
-.mkt-card-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.mkt-card-ticker { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500; letter-spacing: 0.03em; color: #E8E4D9; }
-.mkt-card-name { font-size: 11px; color: #9A9588; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mkt-card-top { display: flex; align-items: center; gap: 8px; }
+.mkt-card-logo { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(231,226,214,0.2); object-fit: cover; flex-shrink: 0; }
+.mkt-logo-empty { background: #26271F; display: inline-block; }
+.mkt-card-ticker { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; color: #E7E2D6; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mkt-card-premium {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 16px;
+  font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
-  padding-top: 2px;
+  border-radius: 6px;
+  padding: 4px 8px;
 }
 
-.mkt-card-prices { display: flex; gap: 20px; }
-.mkt-card-price-cell { display: flex; flex-direction: column; gap: 3px; }
-.mkt-card-price-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #6F6B61; font-weight: 500; }
-.mkt-card-price-value { font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #E8E4D9; font-variant-numeric: tabular-nums; }
-.mkt-card-price-muted { color: #9A9588; }
+.mkt-card-tape { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500; color: #E7E2D6; margin-top: 10px; }
+.mkt-card-mark { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 400; color: #9B968A; margin-top: 2px; }
 
-.mkt-card-chart { height: 56px; }
+.mkt-card-chart { height: 56px; margin-top: 8px; }
 .mkt-sparkline { width: 100%; height: 100%; display: block; }
-.mkt-sparkline-mid { stroke: #2A2B27; stroke-width: 1; }
 .mkt-sparkline-line { }
 
 .mkt-trade-btn {
   display: block;
   text-align: center;
-  background: #C4B49A;
-  color: #0E0F0C;
+  background: #C9B89A;
+  color: #0C0D0B;
   font-family: 'Geist', sans-serif;
   font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  padding: 11px;
-  border-radius: 7px;
+  font-weight: 600;
+  height: 36px;
+  line-height: 36px;
+  border-radius: 8px;
   margin-top: auto;
   transition: opacity 0.15s ease;
 }
@@ -474,18 +468,6 @@ body.mkt-home a { color: inherit; }
 
 .mkt-card.fade-refresh { animation: fadeNum 200ms ease; }
 
-@media (max-width: 640px) {
-  .mkt-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 18px; }
-  .mkt-card { padding: 12px; gap: 10px; border-radius: 10px; }
-  .mkt-card-logo { width: 26px; height: 26px; border-radius: 6px; }
-  .mkt-card-ticker { font-size: 12px; }
-  .mkt-card-name { font-size: 10px; }
-  .mkt-card-premium { font-size: 13px; }
-  .mkt-card-prices { gap: 12px; }
-  .mkt-card-price-value { font-size: 12px; }
-  .mkt-card-chart { height: 40px; }
-  .mkt-trade-btn { padding: 9px; font-size: 11px; }
-}
 @media (max-width: 380px) {
   .mkt-cards { grid-template-columns: 1fr; }
 }
@@ -493,25 +475,22 @@ body.mkt-home a { color: inherit; }
 /* ---------------------------------------------------------------------- */
 /* Footer                                                                  */
 /* ---------------------------------------------------------------------- */
-.mkt-footer { border-top: 1px solid #2A2B27; padding: 28px 0 40px; }
-.mkt-footer-inner { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
-.mkt-footer-icons { display: flex; align-items: center; gap: 18px; }
+.mkt-footer { border-top: 1px solid #26271F; padding: 28px 0; margin-top: 32px; }
+.mkt-footer-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.mkt-footer-icons { display: flex; align-items: center; gap: 28px; }
 .mkt-icon-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid #2A2B27;
-  color: #9A9588;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  width: 28px;
+  height: 28px;
+  color: rgba(231,226,214,0.8);
+  transition: color 0.15s ease;
 }
-.mkt-icon-link:hover { color: #C4B49A; border-color: #C4B49A; }
-.mkt-icon-link-text { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; }
+.mkt-icon-link:hover { color: #C9B89A; }
 .mkt-legal {
-  max-width: 480px;
+  max-width: 420px;
   font-size: 11px;
   line-height: 17px;
-  color: #6F6B61;
+  color: #6E6A60;
 }
