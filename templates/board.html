@@ -7,8 +7,8 @@
     <a href="/" class="mkt-brand">
       <span class="mkt-brand-mark" aria-hidden="true">
         <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
-          <rect x="1" y="1" width="30" height="30" rx="8" stroke="#C4B49A" stroke-width="1.4"/>
-          <path d="M8 21L13 12L17 18L24 9" stroke="#C4B49A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="1" y="1" width="30" height="30" rx="8" stroke="#1475E1" stroke-width="1.4"/>
+          <path d="M8 21L13 12L17 18L24 9" stroke="#1475E1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </span>
       <span class="mkt-wordmark">Marktape</span>
@@ -22,31 +22,57 @@
 
 {% block content %}
 <div class="mkt-frame">
+  <section class="mkt-balance" id="mkt-balance">
+    <span class="mkt-balance-label">Total balance</span>
+    <div class="mkt-balance-value" id="mkt-balance-value" hidden>$0.00</div>
+    <button class="mkt-balance-connect" id="mkt-balance-connect" type="button">Connect wallet</button>
+  </section>
+
   <p class="mkt-thesis">Onchain tape versus the issuer mark.</p>
 
   <div class="mkt-stats" id="mkt-stats">
-    <div class="mkt-stat-card" data-stat="volume">
-      <span class="mkt-stat-label">24h Volume</span>
-      <span class="mkt-stat-value">{{ "${:,.1f}M".format(strip.volume_24h / 1e6) if strip.volume_24h else "—" }}</span>
+    <div class="mkt-stat-card" data-stat="aum">
+      <span class="mkt-stat-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </span>
+      <div class="mkt-stat-text">
+        <span class="mkt-stat-label">AUM</span>
+        <span class="mkt-stat-value">{{ fmt_compact(stats.aum, "$") }}</span>
+      </div>
     </div>
-    <div class="mkt-stat-card" data-stat="liquidity">
-      <span class="mkt-stat-label">Liquidity</span>
-      <span class="mkt-stat-value">{{ "${:,.1f}M".format(strip.liquidity / 1e6) if strip.liquidity else "—" }}</span>
+    <div class="mkt-stat-card" data-stat="volume">
+      <span class="mkt-stat-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </span>
+      <div class="mkt-stat-text">
+        <span class="mkt-stat-label">Volume</span>
+        <span class="mkt-stat-value">{{ fmt_compact(stats.volume, "$") }}</span>
+      </div>
     </div>
     <div class="mkt-stat-card" data-stat="holders">
-      <span class="mkt-stat-label">Holders</span>
-      <span class="mkt-stat-value">{{ "{:,}".format(strip.holders) if strip.holders else "—" }}</span>
+      <span class="mkt-stat-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </span>
+      <div class="mkt-stat-text">
+        <span class="mkt-stat-label">Holders</span>
+        <span class="mkt-stat-value">{{ fmt_compact(stats.holders) }}</span>
+      </div>
     </div>
-    <div class="mkt-stat-card" data-stat="avg_premium">
-      <span class="mkt-stat-label">Avg Premium</span>
-      <span class="mkt-stat-value {{ 'status-rich' if strip.avg_premium and strip.avg_premium > 0 else 'status-cheap' if strip.avg_premium else '' }}">{{ format_premium(strip.avg_premium) }}</span>
+    <div class="mkt-stat-card" data-stat="txns">
+      <span class="mkt-stat-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </span>
+      <div class="mkt-stat-text">
+        <span class="mkt-stat-label">Txns</span>
+        <span class="mkt-stat-value">{{ fmt_compact(stats.txns) }}</span>
+      </div>
     </div>
   </div>
 
   <div class="mkt-search-wrap">
     <svg class="mkt-search-icon" viewBox="0 0 20 20" width="16" height="16" fill="none">
-      <circle cx="8.5" cy="8.5" r="6" stroke="#6E6A60" stroke-width="1.4"/>
-      <path d="M17 17L13.5 13.5" stroke="#6E6A60" stroke-width="1.4" stroke-linecap="round"/>
+      <circle cx="8.5" cy="8.5" r="6" stroke="#6B7A89" stroke-width="1.4"/>
+      <path d="M17 17L13.5 13.5" stroke="#6B7A89" stroke-width="1.4" stroke-linecap="round"/>
     </svg>
     <input type="text" id="mkt-search" class="mkt-search-input" placeholder="Search OPENAI, SPACEX…" autocomplete="off">
   </div>
@@ -104,5 +130,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/balance.js?v={{ static_v('js/balance.js') }}"></script>
 <script src="/static/js/board.js?v={{ static_v('js/board.js') }}"></script>
 {% endblock %}
