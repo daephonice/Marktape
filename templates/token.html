@@ -1,96 +1,160 @@
 {% extends "base.html" %}
 {% block title %}{{ token.symbol }} — Marktape{% endblock %}
+{% block body_class %}mkt-home mkt-token{% endblock %}
+
+{% block header %}
+<header class="mkt-header">
+  <div class="mkt-frame mkt-header-inner">
+    <a href="/" class="mkt-brand">
+      <span class="mkt-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
+          <rect x="1" y="1" width="30" height="30" rx="8" stroke="#C4B49A" stroke-width="1.4"/>
+          <path d="M8 21L13 12L17 18L24 9" stroke="#C4B49A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="mkt-wordmark">Marktape</span>
+    </a>
+    <div class="mkt-header-right">
+      <span class="mkt-stale" id="mkt-stale" hidden>stale <span id="mkt-stale-time"></span></span>
+      <button class="mkt-connect-btn" id="mkt-connect-btn">Connect</button>
+    </div>
+  </div>
+</header>
+{% endblock %}
+
 {% block content %}
-<div class="token-wrap" id="token-page"
+<div class="mkt-frame mkt-tk-frame" id="token-page"
      data-symbol="{{ token.symbol }}"
      data-mint="{{ token.mint }}"
      data-token-price="{{ token.tokenPrice }}"
      data-mark-price="{{ token.markPrice }}">
 
-  <div class="token-left">
-    <a href="/" class="back-link">← Board</a>
-    <div class="token-hero">
-      {% if token.image %}<img class="token-logo" src="{{ token.image }}" alt="">{% endif %}
-      <div>
-        <h1 class="token-symbol">{{ token.symbol }}</h1>
-        <p class="token-name">{{ token.name }}</p>
+  <div class="mkt-tk-left">
+
+    <div class="mkt-tk-identity">
+      {% if token.image %}<img class="mkt-tk-logo" src="{{ token.image }}" alt="">{% else %}<span class="mkt-tk-logo mkt-logo-empty"></span>{% endif %}
+      <div class="mkt-tk-id-text">
+        <span class="mkt-tk-ticker">{{ token.symbol }}</span>
+        <span class="mkt-tk-name">{{ token.name }}</span>
+      </div>
+      <button class="mkt-tk-mint-chip" id="mint-copy" data-mint="{{ token.mint }}" title="{{ token.mint }}">{{ token.mint[:5] }}…{{ token.mint[-4:] }}</button>
+    </div>
+
+    <div class="mkt-tk-tape-row">
+      <span class="mkt-tk-tape mono">${{ "%.2f"|format(token.tokenPrice) if token.tokenPrice is not none else "—" }}</span>
+      <span class="mkt-tk-chg mono status-flat" id="mkt-tk-chg" hidden></span>
+    </div>
+
+    <div class="mkt-tk-chips">
+      <div class="mkt-tk-chip">
+        <span class="mkt-tk-chip-label">MARK</span>
+        <span class="mkt-tk-chip-value mono">${{ "%.2f"|format(token.markPrice) if token.markPrice is not none else "—" }}</span>
+      </div>
+      <div class="mkt-tk-chip">
+        <span class="mkt-tk-chip-label">PREMIUM</span>
+        <span class="mkt-tk-chip-value mono status-{{ premium_status(token.premium) }}">{{ format_premium(token.premium) }}</span>
+      </div>
+      <div class="mkt-tk-chip">
+        <span class="mkt-tk-chip-label">IMPLIED</span>
+        <span class="mkt-tk-chip-value mono">{{ "${:,.0f}".format(token.impliedValuation) if token.impliedValuation else "—" }}</span>
+      </div>
+      <div class="mkt-tk-chip">
+        <span class="mkt-tk-chip-label">LIQUIDITY</span>
+        <span class="mkt-tk-chip-value mono">{{ "${:,.0f}".format(token.liquidity) if token.liquidity else "—" }}</span>
       </div>
     </div>
 
-    <div class="premium-pill status-{{ premium_status(token.premium) }}">{{ format_premium(token.premium) }}</div>
-
-    <div class="tape-mark-row">
-      <div class="big-number">
-        <span class="label">TAPE</span>
-        <span class="value mono">${{ "%.2f"|format(token.tokenPrice) if token.tokenPrice is not none else "—" }}</span>
+    <div class="mkt-tk-chart-panel">
+      <div class="mkt-tk-range-row" id="mkt-tk-range">
+        <button class="mkt-tk-range-btn" data-range="1H">1H</button>
+        <button class="mkt-tk-range-btn" data-range="6H">6H</button>
+        <button class="mkt-tk-range-btn active" data-range="1D">1D</button>
+        <button class="mkt-tk-range-btn" data-range="1W">1W</button>
+        <button class="mkt-tk-range-btn" data-range="1M">1M</button>
       </div>
-      <div class="big-number">
-        <span class="label">MARK</span>
-        <span class="value mono">${{ "%.2f"|format(token.markPrice) if token.markPrice is not none else "—" }}</span>
+      <div class="mkt-tk-plot-wrap">
+        <svg class="mkt-tk-plot" id="mkt-tk-plot" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+        <p class="mkt-tk-no-history" id="mkt-tk-no-history" hidden>No print history yet</p>
       </div>
     </div>
 
-    <div class="val-row">
-      <div><span class="label">Implied Val</span><span class="mono">{{ "${:,.0f}".format(token.impliedValuation) if token.impliedValuation else "—" }}</span></div>
-      <div><span class="label">Mark Val</span><span class="mono">{{ "${:,.0f}".format(token.markValuation) if token.markValuation else "—" }}</span></div>
-      <div><span class="label">Supply</span><span class="mono">{{ "{:,.0f}".format(token.supply) if token.supply else "—" }}</span></div>
+    <div class="mkt-tk-you">
+      <div class="mkt-tk-you-row">
+        <span class="mkt-tk-you-label">In wallet</span>
+        <span class="mkt-tk-you-value mono" id="mkt-tk-wallet-balance">Connect to see</span>
+      </div>
+      <div class="mkt-tk-you-row">
+        <span class="mkt-tk-you-label">Mint</span>
+        <code class="mkt-tk-you-mint mono" id="mkt-tk-mint-full">{{ token.mint }}</code>
+      </div>
     </div>
 
-    <div class="meta-row">
-      <span class="label">Mint</span>
-      <code class="mint-code" id="mint-copy" data-mint="{{ token.mint }}">{{ token.mint }}</code>
-      {% if token.externalUrl %}<a href="{{ token.externalUrl }}" target="_blank" rel="noopener">prestocks.com ↗</a>{% endif %}
-    </div>
-
-    {% if token.description %}<p class="token-description">{{ token.description }}</p>{% endif %}
-
-    {% if telegram_bot_username %}
-    <a class="btn-telegram" href="https://t.me/{{ telegram_bot_username }}?start={{ token.symbol }}" target="_blank" rel="noopener">
-      Watch this in Telegram
-    </a>
-    {% endif %}
-
-    <button class="btn-share" id="share-btn" data-symbol="{{ token.symbol }}">Share</button>
   </div>
 
-  <div class="token-right">
-    <div class="swap-panel" id="swap-panel">
-      <div class="swap-tabs">
-        <button class="swap-tab active" data-side="buy">Buy</button>
-        <button class="swap-tab" data-side="sell">Sell</button>
+  <div class="mkt-tk-right">
+    <div class="mkt-tk-swap" id="swap-panel">
+      <div class="mkt-tk-side-toggle">
+        <button class="mkt-tk-side-btn side-buy active" data-side="buy">Buy</button>
+        <button class="mkt-tk-side-btn side-sell" data-side="sell">Sell</button>
       </div>
+
+      <label class="mkt-tk-amount-label" id="swap-unit-label">USDC</label>
+      <div class="mkt-tk-amount-row">
+        <input type="number" id="swap-amount" class="mkt-tk-amount-input mono" value="100" min="0" step="any">
+        <span class="mkt-tk-unit-chip mono" id="swap-unit">USDC</span>
+      </div>
+
+      <div class="mkt-tk-quote" id="quote-box" hidden>
+        <div class="mkt-tk-quote-row"><span>You get</span><span id="quote-output" class="mono">—</span></div>
+        <div class="mkt-tk-quote-row"><span>Impact</span><span id="quote-impact" class="mono">—</span></div>
+        <div class="mkt-tk-quote-row"><span>Vs mark</span><span id="quote-premium-after" class="mono">—</span></div>
+      </div>
+
+      <p class="mkt-tk-note" id="swap-note"></p>
+
+      <p class="mkt-tk-disclaimer">Not for US persons. Not advice. You sign. We do not hold funds.</p>
 
       <div id="wallet-section">
-        <button id="connect-wallet-btn" class="btn-connect">Connect Wallet</button>
-        <span id="wallet-address" class="wallet-address" hidden></span>
+        <button id="connect-wallet-btn" class="mkt-tk-confirm-btn">Connect wallet</button>
+        <span id="wallet-address" class="mkt-tk-wallet-addr" hidden></span>
+      </div>
+      <button class="mkt-tk-confirm-btn" id="confirm-swap-btn" hidden disabled>Get quote</button>
+
+      <div class="mkt-tk-noroute" id="mkt-tk-noroute" hidden>
+        No route — <a id="jup-fallback-link" class="mkt-tk-jup-link" href="#" target="_blank" rel="noopener">Open on Jupiter</a>
       </div>
 
-      <label class="swap-label">Amount
-        <input type="number" id="swap-amount" value="100" min="0" step="any">
-        <span id="swap-unit">USD</span>
-      </label>
-
-      <div class="quote-box" id="quote-box" hidden>
-        <div class="quote-row"><span>You receive</span><span id="quote-output" class="mono">—</span></div>
-        <div class="quote-row"><span>Implied price</span><span id="quote-price" class="mono">—</span></div>
-        <div class="quote-row"><span>Price impact</span><span id="quote-impact" class="mono">—</span></div>
-        <div class="quote-row"><span>Premium after fill</span><span id="quote-premium-after" class="mono">—</span></div>
-        <div class="quote-row"><span>Route</span><span id="quote-route" class="mono">—</span></div>
-        <div class="quote-row"><span>Slippage</span><span id="quote-slippage" class="mono">—</span></div>
-      </div>
-
-      <p class="swap-note" id="swap-note"></p>
-
-      <p class="swap-disclaimer">Not for US persons. Not investment advice. Economic exposure only, via an SPV.</p>
-
-      <button class="btn-confirm" id="confirm-swap-btn" disabled>Get quote</button>
-
-      <div class="swap-result" id="swap-result" hidden></div>
-
-      <a class="jup-fallback" id="jup-fallback-link" href="#" target="_blank" rel="noopener" hidden>Trade on jup.ag instead ↗</a>
+      <div class="mkt-tk-result" id="swap-result" hidden></div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block footer %}
+<footer class="mkt-footer">
+  <div class="mkt-frame mkt-footer-inner">
+    <div class="mkt-footer-icons">
+      {% if telegram_public_url %}
+      <a href="{{ telegram_public_url }}" target="_blank" rel="noopener" aria-label="Telegram" title="Telegram" class="mkt-icon-link">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M21.5 3.5L2.5 11l6 2.2m13-9.7L16 20.5l-7.5-7.3m13-9.7L8.5 13.2m0 0v6.3l3-3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      {% endif %}
+      <a href="https://github.com" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub" class="mkt-icon-link">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M12 2C6.48 2 2 6.58 2 12.2c0 4.5 2.87 8.31 6.84 9.66.5.1.68-.22.68-.49v-1.9c-2.78.62-3.37-1.37-3.37-1.37-.46-1.2-1.11-1.52-1.11-1.52-.9-.63.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.9 1.55 2.34 1.1 2.91.84.09-.66.35-1.1.63-1.36-2.22-.26-4.56-1.13-4.56-5.02 0-1.11.39-2.02 1.03-2.73-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.04A9.3 9.3 0 0112 6.85c.85 0 1.71.12 2.51.34 1.9-1.32 2.75-1.04 2.75-1.04.55 1.4.2 2.44.1 2.7.64.71 1.03 1.62 1.03 2.73 0 3.9-2.34 4.76-4.57 5.01.36.32.68.94.68 1.9v2.82c0 .27.18.6.69.49A10.02 10.02 0 0022 12.2C22 6.58 17.52 2 12 2z" fill="currentColor"/></svg>
+      </a>
+      <a href="https://prestocks.com" target="_blank" rel="noopener" aria-label="PreStocks" title="PreStocks" class="mkt-icon-link">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.4"/><path d="M8 15V9l4 3 4-3v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+    <p class="mkt-legal">
+      Economic exposure only. Not shares, not for US persons, not advice.<br>
+      Swaps sign in your wallet. Marktape does not custody funds.
+    </p>
+    {% if telegram_bot_username %}
+    <a class="mkt-tk-watch-link" href="https://t.me/{{ telegram_bot_username }}?start={{ token.symbol }}" target="_blank" rel="noopener">Watch {{ token.symbol }} in Telegram</a>
+    {% endif %}
+  </div>
+</footer>
 {% endblock %}
 
 {% block scripts %}
