@@ -156,7 +156,7 @@
   if (connectBtn) {
     connectBtn.addEventListener('click', async () => {
       if (!window.MarktapeWallet) return;
-      const pubkey = await window.MarktapeWallet.connectWallet();
+      const pubkey = await window.MarktapeWallet.connectWithPicker();
       if (!pubkey) return;
       connectBtn.textContent = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
       connectBtn.classList.add('connected');

@@ -129,7 +129,7 @@
   }, QUOTE_REFRESH_MS);
 
   connectBtn.addEventListener('click', async () => {
-    const pubkey = await window.MarktapeWallet.connectWallet();
+    const pubkey = await window.MarktapeWallet.connectWithPicker();
     if (!pubkey) return;
     wallet = pubkey;
     walletAddrEl.textContent = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
