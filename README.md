@@ -62,5 +62,4 @@ in Railway (Variables → Seal).
 6. Healthcheck: `GET /api/health` → `{ "ok": true, "fetchedAt": ... }`.
 
 One service (`web`) runs both the FastAPI app and the Telegram bot (aiogram
-long polling as a background asyncio task started on FastAPI startup) — same
-process, same pattern as Daephon Casino.
+long polling as a background asyncio task started on FastAPI startup).
