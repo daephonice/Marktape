@@ -97,29 +97,6 @@ async def fetch_prestocks(client: httpx.AsyncClient | None = None) -> list[dict]
     return out
 
 
-async def fetch_prestocks_stats(client: httpx.AsyncClient | None = None) -> dict | None:
-    """Optional /api/stats endpoint. Best-effort — returns None on any
-    failure so callers never block the board on this."""
-    base = PRESTOCKS_API_URL.rstrip("/")
-    if base.endswith("/prestocks"):
-        stats_url = base[: -len("/prestocks")] + "/stats"
-    else:
-        stats_url = base + "/stats"
-
-    owns_client = client is None
-    client = client or httpx.AsyncClient(timeout=8)
-    try:
-        resp = await client.get(stats_url, headers={"Accept": "application/json"})
-        if resp.status_code != 200:
-            return None
-        return resp.json()
-    except Exception:
-        return None
-    finally:
-        if owns_client:
-            await client.aclose()
-
-
 def normalize_row(record: dict, multiplier: float = 1.0) -> dict:
     """Map a raw PreStocks record -> TokenRow shape used by templates/API."""
     token_price = record.get("tokenPrice")

@@ -8,6 +8,8 @@ import prestocks
 import multiplier as multiplier_mod
 import jupiter
 import board as board_mod
+import balances
+import market_stats
 from database import SessionLocal
 from models import PriceSnapshot
 
@@ -29,6 +31,33 @@ async def get_board():
         # Cold start (first request before the background loop has run once).
         snap = await board_mod.build_snapshot()
     return snap
+
+
+@router.get("/market-stats")
+async def api_market_stats():
+    snap = prestocks.get_cached_snapshot()
+    return market_stats.get_stats(snap.get("tokens", []))
+
+
+@router.get("/prices")
+async def api_prices():
+    """SOL / USDT / USDC in USD — polled every 2s by the homepage total balance."""
+    data = await balances.get_prices()
+    if not data:
+        raise HTTPException(status_code=503, detail="Prices unavailable")
+    return data
+
+
+@router.get("/balances/{address}")
+async def api_balances(address: str):
+    """SOL / USDT / USDC holdings (UI amounts) of a wallet."""
+    try:
+        return await balances.get_balances(address)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid address")
+    except Exception:
+        log.warning("balances: lookup failed for %s", address, exc_info=True)
+        raise HTTPException(status_code=502, detail="Balance lookup failed")
 
 
 @router.get("/sparkline/{symbol}")

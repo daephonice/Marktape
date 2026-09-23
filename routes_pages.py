@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 import prestocks
+import market_stats
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -23,35 +24,16 @@ templates.env.globals["telegram_public_url"] = os.getenv("TELEGRAM_PUBLIC_URL", 
 templates.env.globals["telegram_bot_username"] = os.getenv("TELEGRAM_BOT_USERNAME", "")
 templates.env.globals["format_premium"] = prestocks.format_premium
 templates.env.globals["premium_status"] = prestocks.premium_status
-
-
-def _strip_facts(tokens: list, stats: dict | None = None) -> dict:
-    priced = [t for t in tokens if t.get("premium") is not None]
-    avg_premium = sum(t["premium"] for t in priced) / len(priced) if priced else None
-    stats = stats or {}
-
-    def _num(v):
-        if isinstance(v, (int, float)):
-            return v
-        if isinstance(v, (list, tuple)) and v and isinstance(v[-1], (int, float)):
-            return v[-1]
-        return None
-
-    return {
-        "count": len(tokens),
-        "avg_premium": avg_premium,
-        "volume_24h": _num(stats.get("volume24h") or stats.get("volume_24h")),
-        "liquidity": _num(stats.get("liquidity")),
-        "holders": _num(stats.get("holders")),
-    }
+templates.env.globals["fmt_compact"] = market_stats.fmt_compact
 
 
 @router.get("/", response_class=HTMLResponse)
 async def board_page(request: Request):
     snap = prestocks.get_cached_snapshot()
-    stats = await prestocks.fetch_prestocks_stats()
+    if not market_stats.attempted():
+        await market_stats.refresh()
     return templates.TemplateResponse(
-        request, "board.html", {"snapshot": snap, "strip": _strip_facts(snap.get("tokens", []), stats)}
+        request, "board.html", {"snapshot": snap, "stats": market_stats.get_stats(snap.get("tokens", []))}
     )
 
 
