@@ -27,14 +27,17 @@ templates.env.globals["premium_status"] = prestocks.premium_status
 
 def _strip_facts(tokens: list) -> dict:
     priced = [t for t in tokens if t.get("premium") is not None]
-    if not priced:
-        return {"cheapest": None, "richest": None, "count": len(tokens)}
-    cheapest = min(priced, key=lambda t: t["premium"])
-    richest = max(priced, key=lambda t: t["premium"])
+    valued = [t for t in tokens if t.get("markValuation")]
+    cheapest = min(priced, key=lambda t: t["premium"]) if priced else None
+    richest = max(priced, key=lambda t: t["premium"]) if priced else None
+    avg_premium = sum(t["premium"] for t in priced) / len(priced) if priced else None
+    combined_mark_val = sum(t["markValuation"] for t in valued) if valued else None
     return {
-        "cheapest": cheapest if cheapest["premium"] < 0 else None,
-        "richest": richest if richest["premium"] > 0 else None,
+        "cheapest": cheapest if cheapest and cheapest["premium"] < 0 else None,
+        "richest": richest if richest and richest["premium"] > 0 else None,
         "count": len(tokens),
+        "avg_premium": avg_premium,
+        "combined_mark_val": combined_mark_val,
     }
 
 

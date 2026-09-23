@@ -2,11 +2,14 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 
 import prestocks
 import multiplier as multiplier_mod
 import jupiter
 import board as board_mod
+from database import SessionLocal
+from models import PriceSnapshot
 
 log = logging.getLogger("routes_api")
 
@@ -26,6 +29,26 @@ async def get_board():
         # Cold start (first request before the background loop has run once).
         snap = await board_mod.build_snapshot()
     return snap
+
+
+@router.get("/sparkline/{symbol}")
+async def get_sparkline(symbol: str, limit: int = 48):
+    """Last N price_snapshots rows for one symbol, oldest first — enough
+    for a lightweight line chart on the board cards. Reads only; the rows
+    are written by board.py's refresh loop, no new writes here."""
+    symbol_u = symbol.upper()
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            select(PriceSnapshot.token_price, PriceSnapshot.fetched_at)
+            .where(PriceSnapshot.symbol == symbol_u)
+            .order_by(PriceSnapshot.fetched_at.desc())
+            .limit(limit)
+        ).all()
+    finally:
+        db.close()
+    rows = list(reversed(rows))
+    return {"symbol": symbol_u, "points": [r[0] for r in rows]}
 
 
 @router.get("/token/{symbol}")
