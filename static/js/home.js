@@ -20,6 +20,7 @@
 
   const $ = (id) => document.getElementById(id);
   const els = {
+    dashboard: $('hm-dashboard'),
     total: $('hm-total'),
     change: $('hm-change'),
     changeText: $('hm-change-text'),
@@ -349,16 +350,22 @@
     els.panelEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
   }
 
+  function syncDashboard() {
+    const swapOpen = !!(window.MarktapeTrade && window.MarktapeTrade.isOpen());
+    if (els.dashboard) els.dashboard.hidden = panelOpen || swapOpen;
+  }
+
   function setPanel(open) {
     panelOpen = open;
     els.panel.classList.toggle('open', open);
     els.panel.setAttribute('aria-hidden', open ? 'false' : 'true');
-    document.documentElement.classList.toggle('stk-lock', open);
     if (els.tabHome) els.tabHome.classList.toggle('active', !open);
     if (els.tabStocks) els.tabStocks.classList.toggle('active', open);
+    syncDashboard();
     if (open) {
       renderPanel();
       els.panel.scrollTop = 0;
+      window.scrollTo(0, 0);
     }
   }
 
@@ -629,6 +636,7 @@
   });
 
   // ---- Trade (Swap) ---------------------------------------------------------
+  window.addEventListener('marktape:trade-panel', syncDashboard);
   function setSwapTabActive(open) {
     if (els.tabSwap) els.tabSwap.classList.toggle('active', open);
     if (open && els.tabHome) els.tabHome.classList.remove('active');
@@ -694,6 +702,7 @@
   if (bootPanel === 'stocks') setPanel(true);
   else if (bootPanel === 'swap' && state.address) openTrade();
   else if (bootPanel === 'swap') history.replaceState(null, '', '/');
+  syncDashboard();
   renderAll();
   setSwapTabActive(!!(window.MarktapeTrade && window.MarktapeTrade.isOpen()));
   tickPrices();

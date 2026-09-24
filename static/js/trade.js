@@ -160,6 +160,11 @@
         </div>
       </div>`;
     document.body.appendChild(root);
+    // Placed in normal page flow (inside <main>, alongside the dashboard)
+    // rather than left as a body-level overlay, so /swap reads as its own
+    // page like /stocks and /t/SYMBOL, not a panel stacked on top of home.
+    const main = document.querySelector('main');
+    if (main) main.appendChild(root);
 
     const q = (s) => root.querySelector(s);
     Object.assign(R, {
@@ -255,9 +260,14 @@
       R.tokList.appendChild(row);
     });
     R.tok.hidden = false;
+    document.documentElement.classList.add('trd-tok-lock');
   }
 
-  function closeTokens() { R.tok.hidden = true; tokFor = null; }
+  function closeTokens() {
+    R.tok.hidden = true;
+    tokFor = null;
+    document.documentElement.classList.remove('trd-tok-lock');
+  }
 
   function selectToken(sym) {
     const which = tokFor;
@@ -474,6 +484,7 @@
     R.iOut.insertAdjacentHTML('beforeend', ICON.external);
 
     R.infoModal.hidden = false;
+    document.documentElement.classList.add('trd-tok-lock');
     requestAnimationFrame(() => requestAnimationFrame(() => {
       R.infoBack.classList.add('open');
       R.infoModal.querySelector('.trd-info-sheet').classList.add('open');
@@ -481,6 +492,7 @@
   }
 
   function closeInfo() {
+    document.documentElement.classList.remove('trd-tok-lock');
     R.infoBack.classList.remove('open');
     const sheet = R.infoModal.querySelector('.trd-info-sheet');
     sheet.classList.remove('open');
@@ -511,6 +523,7 @@
         const res = await postJSON('/api/swap/execute', {
           signedTransaction: signed.signedTransactionBase64,
           requestId: sess.order.requestId,
+          provider: sess.order.provider || 'ultra',
         });
         if (res.status && res.status !== 'Success' && res.status !== 'success') {
           throw new Error('Swap failed on-chain, please try again');
@@ -559,8 +572,9 @@
     root.hidden = false;
     root.setAttribute('aria-hidden', 'false');
     document.documentElement.classList.add('trd-lock');
+    root.classList.add('open');
+    window.dispatchEvent(new CustomEvent('marktape:trade-panel', { detail: { open: true } }));
     render();
-    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('open')));
   }
 
   function close() {
@@ -570,10 +584,12 @@
     R.inputSell.blur();
     R.tok.hidden = true;
     R.infoModal.hidden = true;
+    document.documentElement.classList.remove('trd-tok-lock');
     root.classList.remove('open');
     root.setAttribute('aria-hidden', 'true');
     document.documentElement.classList.remove('trd-lock');
-    setTimeout(() => { if (!S) root.hidden = true; }, 260);
+    root.hidden = true;
+    window.dispatchEvent(new CustomEvent('marktape:trade-panel', { detail: { open: false } }));
   }
 
   function isOpen() { return !!S; }
