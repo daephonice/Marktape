@@ -331,12 +331,49 @@
     throw new Error('Wallet does not support signing');
   }
 
+  function bytesToBase58(bytes) {
+    const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    let n = 0n;
+    for (const b of bytes) n = (n << 8n) | BigInt(b);
+    let out = '';
+    while (n > 0n) { out = A[Number(n % 58n)] + out; n /= 58n; }
+    for (const b of bytes) { if (b === 0) out = '1' + out; else break; }
+    return out;
+  }
+
+  /* Sign only, never broadcast: the server relays through its own RPC.
+   * Resolves { signedTransactionBase64 }, or { signature } (base58) for a
+   * wallet that can only sign-and-send itself. */
+  async function signTransactionForSend(base64Tx) {
+    const state = window.__marktapeWallet;
+    if (!state) throw new Error('Wallet not connected');
+    if (state.kind !== 'standard') throw new Error('This wallet is not supported for sending');
+    const { wallet, account } = state;
+    const raw = base64ToBytes(base64Tx);
+    const chain = SOLANA_CHAINS.find((c) => (wallet.chains || []).includes(c)) || 'solana:mainnet';
+
+    const signFeature = wallet.features['solana:signTransaction'];
+    if (signFeature) {
+      const results = await signFeature.signTransaction({ account, transaction: raw, chain });
+      const first = (results || [])[0];
+      if (first && first.signedTransaction) return { signedTransactionBase64: bytesToBase64(first.signedTransaction) };
+    }
+    const sendFeature = wallet.features['solana:signAndSendTransaction'];
+    if (sendFeature) {
+      const results = await sendFeature.signAndSendTransaction({ account, transaction: raw, chain });
+      const first = (results || [])[0];
+      if (first && first.signature) return { signature: bytesToBase58(first.signature) };
+    }
+    throw new Error(`${wallet.name} does not support signing`);
+  }
+
   window.MarktapeWallet = {
     connectWallet,
     connectWithPicker,
     connectByName,
     listAvailableWallets,
     signTransactionBase64,
+    signTransactionForSend,
     getAddress,
     disconnect,
     getProvider: getLegacyProvider, // kept for back-compat with older callers

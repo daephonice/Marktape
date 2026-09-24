@@ -3,7 +3,8 @@
  *   /api/balances/{addr}  wallet holdings across the 11 accepted assets
  *   /api/news             news feed
  * Values are computed here: balance = sum(amount * price) over ALL holdings;
- * Portfolio shows the top 3 by USD value. Send / Swap / Lend are inert for now.
+ * Portfolio shows the top 3 by USD value. Send opens the send flow (send.js);
+ * Swap / Lend are inert for now.
  */
 (function () {
   const PRICE_MS = 1000;
@@ -18,6 +19,7 @@
     change: $('hm-change'),
     changeText: $('hm-change-text'),
     actions: $('hm-actions'),
+    sendBtn: $('hm-send-btn'),
     notice: $('hm-lock-notice'),
     watchRows: $('hm-watch-rows'),
     watchEmpty: $('hm-watch-empty'),
@@ -172,6 +174,9 @@
     const connected = !!state.address;
     els.notice.hidden = connected;
     els.actions.classList.toggle('locked', !connected);
+    els.sendBtn.classList.toggle('live', connected);
+    if (connected) els.sendBtn.removeAttribute('aria-disabled');
+    else els.sendBtn.setAttribute('aria-disabled', 'true');
 
     if (!connected) {
       els.total.textContent = '$0.00';
@@ -406,6 +411,18 @@
     }
     renderNews();
   }
+
+  // ---- Send ---------------------------------------------------------------
+  els.sendBtn.addEventListener('click', () => {
+    if (!state.address || !window.MarktapeSend) return;
+    window.MarktapeSend.open({
+      getCtx: () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets }),
+      onSent: () => {
+        tickBalances();
+        setTimeout(tickBalances, 2500); // pick up the settled balance
+      },
+    });
+  });
 
   // ---- Wallet -------------------------------------------------------------
   function setAddress(next) {
