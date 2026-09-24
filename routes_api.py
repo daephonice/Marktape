@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -10,6 +10,7 @@ import jupiter
 import board as board_mod
 import balances
 import prices
+import send
 from database import SessionLocal
 from models import PriceSnapshot, NewsItem
 
@@ -168,3 +169,51 @@ async def swap_execute(body: SwapExecuteRequest):
         log.warning("swap_execute: ultra execute failed", exc_info=True)
         raise HTTPException(status_code=502, detail="Execution failed")
     return result
+
+
+def _ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
+
+
+class SendBuildRequest(BaseModel):
+    fromAddress: str
+    toAddress: str
+    symbol: str
+    amount: str
+    sendMax: bool = False
+
+
+@router.post("/send/build")
+async def send_build(body: SendBuildRequest, request: Request):
+    """Unsigned transfer (base64) for the connected wallet to sign."""
+    try:
+        send.check_rate(_ip(request), "build")
+        return await send.build_transfer(
+            body.fromAddress, body.toAddress, body.symbol, body.amount, body.sendMax
+        )
+    except send.SendError as e:
+        raise HTTPException(status_code=e.status, detail=e.message)
+    except Exception:
+        log.warning("send_build failed", exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not prepare the transfer, try again")
+
+
+class SendSubmitRequest(BaseModel):
+    signedTransaction: str | None = None
+    signature: str | None = None
+    lastValidBlockHeight: int = 0
+    payer: str | None = None
+
+
+@router.post("/send/submit")
+async def send_submit(body: SendSubmitRequest, request: Request):
+    """Relay the wallet-signed transfer through our RPC and wait for confirmation."""
+    try:
+        send.check_rate(_ip(request), "submit")
+        return await send.submit(body.signedTransaction, body.signature, body.lastValidBlockHeight, body.payer)
+    except send.SendError as e:
+        raise HTTPException(status_code=e.status, detail=e.message)
+    except Exception:
+        log.warning("send_submit failed", exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not send the transaction, try again")
