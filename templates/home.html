@@ -38,7 +38,7 @@
 
   <div class="hm-actions locked" id="hm-actions">
     <div class="hm-action">
-      <button class="hm-action-btn" type="button" aria-disabled="true" aria-label="Send">
+      <button class="hm-action-btn" id="hm-send-btn" type="button" aria-disabled="true" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
       </button>
       <span class="hm-action-label">Send</span>
@@ -93,5 +93,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/send.js?v={{ static_v('js/send.js') }}"></script>
 <script src="/static/js/home.js?v={{ static_v('js/home.js') }}"></script>
 {% endblock %}
