@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, BigInteger, JSON, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, BigInteger, JSON, Index, Text
 
 from database import Base
 
@@ -41,3 +41,15 @@ class Watch(Base):
     __table_args__ = (
         Index("ix_watches_chat_symbol", "chat_id", "symbol", unique=True),
     )
+
+
+class NewsItem(Base):
+    """Homepage news feed entry for one PreStocks symbol. Price / change / MC
+    shown next to it are live, read from the price cache — not stored here."""
+    __tablename__ = "news_items"
+
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String, nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    published_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)

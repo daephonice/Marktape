@@ -5,7 +5,6 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 import prestocks
-import market_stats
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -24,17 +23,11 @@ templates.env.globals["telegram_public_url"] = os.getenv("TELEGRAM_PUBLIC_URL", 
 templates.env.globals["telegram_bot_username"] = os.getenv("TELEGRAM_BOT_USERNAME", "")
 templates.env.globals["format_premium"] = prestocks.format_premium
 templates.env.globals["premium_status"] = prestocks.premium_status
-templates.env.globals["fmt_compact"] = market_stats.fmt_compact
 
 
 @router.get("/", response_class=HTMLResponse)
-async def board_page(request: Request):
-    snap = prestocks.get_cached_snapshot()
-    if not market_stats.attempted():
-        await market_stats.refresh()
-    return templates.TemplateResponse(
-        request, "board.html", {"snapshot": snap, "stats": market_stats.get_stats(snap.get("tokens", []))}
-    )
+async def home_page(request: Request):
+    return templates.TemplateResponse(request, "home.html", {})
 
 
 @router.get("/t/{symbol}", response_class=HTMLResponse)

@@ -9,9 +9,9 @@ import multiplier as multiplier_mod
 import jupiter
 import board as board_mod
 import balances
-import market_stats
+import prices
 from database import SessionLocal
-from models import PriceSnapshot
+from models import PriceSnapshot, NewsItem
 
 log = logging.getLogger("routes_api")
 
@@ -33,24 +33,25 @@ async def get_board():
     return snap
 
 
-@router.get("/market-stats")
-async def api_market_stats():
-    snap = prestocks.get_cached_snapshot()
-    return market_stats.get_stats(snap.get("tokens", []))
-
-
 @router.get("/prices")
 async def api_prices():
-    """SOL / USDT / USDC in USD — polled every 2s by the homepage total balance."""
-    data = await balances.get_prices()
+    """Price + 24h change for every accepted asset, served from the shared
+    in-memory cache (refreshed server-side every second)."""
+    data = prices.get_prices()
     if not data:
         raise HTTPException(status_code=503, detail="Prices unavailable")
     return data
 
 
+@router.get("/assets")
+async def api_assets():
+    """Display metadata (name, logo, kind) for every accepted asset."""
+    return prices.get_assets()
+
+
 @router.get("/balances/{address}")
 async def api_balances(address: str):
-    """SOL / USDT / USDC holdings (UI amounts) of a wallet."""
+    """Non-zero holdings (UI amounts) of a wallet across the accepted assets."""
     try:
         return await balances.get_balances(address)
     except ValueError:
@@ -58,6 +59,30 @@ async def api_balances(address: str):
     except Exception:
         log.warning("balances: lookup failed for %s", address, exc_info=True)
         raise HTTPException(status_code=502, detail="Balance lookup failed")
+
+
+@router.get("/news")
+def api_news(limit: int = 20):
+    """Latest homepage news, newest first."""
+    limit = max(1, min(limit, 50))
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            select(NewsItem).order_by(NewsItem.published_at.desc()).limit(limit)
+        ).scalars().all()
+        return {
+            "items": [
+                {
+                    "id": r.id,
+                    "symbol": r.symbol.upper(),
+                    "body": r.body,
+                    "publishedAt": r.published_at.isoformat(),
+                }
+                for r in rows
+            ]
+        }
+    finally:
+        db.close()
 
 
 @router.get("/sparkline/{symbol}")

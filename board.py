@@ -12,7 +12,6 @@ import httpx
 import prestocks
 import multiplier as multiplier_mod
 import jupiter
-import market_stats
 from database import SessionLocal
 from models import PriceSnapshot
 
@@ -86,10 +85,6 @@ async def _refresh_loop():
             await build_snapshot()
         except Exception:
             log.exception("board: refresh loop iteration failed")
-        try:
-            await market_stats.refresh()
-        except Exception:
-            log.exception("board: market stats refresh failed")
         await asyncio.sleep(REFRESH_SECONDS)
 
 

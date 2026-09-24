@@ -1,10 +1,12 @@
-"""Total-balance backend: SOL + USDT + USDC holdings of the connected wallet,
-plus the USD price feed the homepage multiplies them by.
+"""Wallet holdings: what the connected wallet holds out of the 11 assets the
+site accepts — SOL, USDT, USDC and every PreStocks token.
 
-Prices are fetched once per PRICE_TTL and shared by every browser polling
-/api/prices, so 2-second client polling never multiplies upstream load.
+Amounts are UI amounts. PreStocks mints are Token-2022 scaled-UI-amount mints,
+so their raw balance is corrected with the on-chain multiplier. Valuation
+happens in the browser against the shared price cache (/api/prices).
+
 RPC calls go through SOLANA_RPC_URL server-side — the key never reaches the
-browser.
+browser. Three calls per lookup, cached per address for BALANCE_TTL seconds.
 """
 import os
 import re
@@ -14,26 +16,25 @@ import logging
 
 import httpx
 
-import jupiter
+import prices
+import prestocks
+import multiplier as multiplier_mod
 
 log = logging.getLogger("balances")
 
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 
-MINTS = {
-    "SOL": "So11111111111111111111111111111111111111112",
+TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+STABLE_MINTS = {
     "USDT": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
     "USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
 }
 LAMPORTS_PER_SOL = 1_000_000_000
 
-PRICE_TTL = 1.5     # seconds
 BALANCE_TTL = 4.0   # seconds, per address
 _ADDR_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
 _client: httpx.AsyncClient | None = None
-_price_cache: dict = {"at": 0.0, "data": None}
-_price_lock = asyncio.Lock()
 _balance_cache: dict[str, tuple[float, dict]] = {}
 
 
@@ -42,27 +43,6 @@ def _http() -> httpx.AsyncClient:
     if _client is None or _client.is_closed:
         _client = httpx.AsyncClient(timeout=8)
     return _client
-
-
-async def get_prices() -> dict | None:
-    """{"SOL": usd, "USDT": usd, "USDC": usd}. Falls back to the last good
-    snapshot if Jupiter hiccups; None only if we have never had one."""
-    if _price_cache["data"] and time.monotonic() - _price_cache["at"] < PRICE_TTL:
-        return _price_cache["data"]
-    async with _price_lock:
-        if _price_cache["data"] and time.monotonic() - _price_cache["at"] < PRICE_TTL:
-            return _price_cache["data"]
-        raw = await jupiter.get_prices(list(MINTS.values()), _http())
-        fresh = {}
-        for symbol, mint in MINTS.items():
-            entry = raw.get(mint) if isinstance(raw, dict) else None
-            usd = entry.get("usdPrice") if isinstance(entry, dict) else None
-            if isinstance(usd, (int, float)) and usd > 0:
-                fresh[symbol] = float(usd)
-        merged = {**(_price_cache["data"] or {}), **fresh}
-        if len(merged) == len(MINTS):
-            _price_cache.update(at=time.monotonic(), data=merged)
-        return _price_cache["data"]
 
 
 async def _rpc(method: str, params: list):
@@ -81,32 +61,60 @@ async def _sol_balance(address: str) -> float:
     return result["value"] / LAMPORTS_PER_SOL
 
 
-async def _token_balance(address: str, mint: str) -> float:
+async def _token_accounts(address: str, program_id: str) -> dict[str, tuple[int, int]]:
+    """{mint: (raw_amount, decimals)} summed over every token account the
+    wallet owns under one token program."""
     result = await _rpc(
         "getTokenAccountsByOwner",
-        [address, {"mint": mint}, {"encoding": "jsonParsed", "commitment": "confirmed"}],
+        [address, {"programId": program_id}, {"encoding": "jsonParsed", "commitment": "confirmed"}],
     )
-    total = 0.0
+    totals: dict[str, tuple[int, int]] = {}
     for acc in result.get("value") or []:
         info = (((acc.get("account") or {}).get("data") or {}).get("parsed") or {}).get("info") or {}
-        total += float((info.get("tokenAmount") or {}).get("uiAmountString") or 0)
-    return total
+        mint = info.get("mint")
+        amount = info.get("tokenAmount") or {}
+        raw = int(amount.get("amount") or 0)
+        if mint and raw > 0:
+            totals[mint] = (totals.get(mint, (0, 0))[0] + raw, int(amount.get("decimals") or 0))
+    return totals
+
+
+async def _stock_ui_amount(mint: str, raw: int, decimals: int) -> float:
+    m = await multiplier_mod.get_mint_multiplier(mint)
+    return multiplier_mod.to_ui_amount(raw, decimals, m["multiplier"])
 
 
 async def get_balances(address: str) -> dict:
-    """{"SOL": ui_amount, "USDT": ui_amount, "USDC": ui_amount}. Raises
+    """{"holdings": {SYMBOL: ui_amount}} — non-zero holdings only. Raises
     ValueError on a malformed address."""
     if not _ADDR_RE.match(address):
         raise ValueError("invalid address")
     hit = _balance_cache.get(address)
     if hit and time.monotonic() - hit[0] < BALANCE_TTL:
         return hit[1]
-    sol, usdt, usdc = await asyncio.gather(
+
+    sol, classic, token22 = await asyncio.gather(
         _sol_balance(address),
-        _token_balance(address, MINTS["USDT"]),
-        _token_balance(address, MINTS["USDC"]),
+        _token_accounts(address, TOKEN_PROGRAM_ID),
+        _token_accounts(address, prestocks.TOKEN_2022_PROGRAM_ID),
     )
-    data = {"SOL": sol, "USDT": usdt, "USDC": usdc}
+    accounts = {**classic, **token22}
+
+    holdings: dict[str, float] = {}
+    if sol > 0:
+        holdings["SOL"] = sol
+    for symbol, mint in STABLE_MINTS.items():
+        if mint in accounts:
+            raw, decimals = accounts[mint]
+            holdings[symbol] = raw / (10 ** decimals)
+
+    held_stocks = [(mint, symbol) for mint, symbol in prices.stock_mints().items() if mint in accounts]
+    amounts = await asyncio.gather(*(_stock_ui_amount(mint, *accounts[mint]) for mint, _ in held_stocks))
+    for (_, symbol), amount in zip(held_stocks, amounts):
+        if amount > 0:
+            holdings[symbol] = amount
+
+    data = {"holdings": holdings}
     if len(_balance_cache) > 500:
         _balance_cache.clear()
     _balance_cache[address] = (time.monotonic(), data)
