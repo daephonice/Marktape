@@ -1,14 +1,14 @@
 {# Floating bottom bar. Pass `nav_active` ('home' | 'stocks' | 'swap' | 'portfolio') before including.
-   Only Home is a live link for now; swap a <span> for <a href="…"> as each page ships. #}
+   Home and Stocks are live (home.js drives the Stocks panel); Swap / Portfolio are inert for now. #}
 <nav class="hm-nav" aria-label="Primary">
-  <a class="hm-tab{{ ' active' if nav_active == 'home' }}" href="/">
+  <a class="hm-tab{{ ' active' if nav_active == 'home' }}" href="/" data-tab="home">
     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.2 3.4 10.4c-.3.2-.4.5-.4.8V20a1 1 0 0 0 1 1h5.2v-6.2h6.6V21H20a1 1 0 0 0 1-1v-8.8c0-.3-.1-.6-.4-.8z"/></svg>
     <span>Home</span>
   </a>
-  <span class="hm-tab{{ ' active' if nav_active == 'stocks' }}">
+  <button class="hm-tab{{ ' active' if nav_active == 'stocks' }}" type="button" data-tab="stocks">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
     <span>Stocks</span>
-  </span>
+  </button>
   <span class="hm-tab{{ ' active' if nav_active == 'swap' }}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
     <span>Swap</span>

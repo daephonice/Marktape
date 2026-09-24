@@ -59,12 +59,13 @@
   <p class="hm-lock-notice" id="hm-lock-notice">Connect Wallet to Access</p>
 
   <section class="hm-card">
-    <div class="hm-card-head">
-      <h2>Watchlist</h2>
+    <button class="hm-card-head hm-card-link" id="hm-stocks-open" type="button" aria-label="View all stocks">
+      <h2>Stocks</h2>
+      <span class="hm-viewall">View all</span>
       <svg class="hm-icon" width="20" height="20"><use href="#i-chevron"/></svg>
-    </div>
-    <div class="hm-rows" id="hm-watch-rows"></div>
-    <p class="hm-empty" id="hm-watch-empty">Connect wallet</p>
+    </button>
+    <div class="hm-rows" id="hm-stock-rows"></div>
+    <p class="hm-empty" id="hm-stock-empty">Loading…</p>
   </section>
 
   <section class="hm-card">
@@ -82,6 +83,15 @@
     <p class="hm-news-empty" id="hm-news-empty" hidden>No news available yet</p>
   </section>
 </div>
+
+<section class="stk-panel" id="stk-panel" aria-label="Stocks" aria-hidden="true">
+  <div class="hm-col">
+    <h2 class="stk-title">Stocks</h2>
+    <div class="stk-cols"><span>Token</span><span>Price/Δ%</span><span>MC</span></div>
+    <div class="stk-rows" id="stk-rows"></div>
+    <p class="hm-empty" id="stk-empty">Loading…</p>
+  </div>
+</section>
 {% endblock %}
 
 {% block footer %}
