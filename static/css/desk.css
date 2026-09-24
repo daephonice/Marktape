@@ -424,11 +424,41 @@ button.hm-tab.active { background: var(--hm-ctrl-on); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
-  transform: translateY(100%);
+  padding-top: 16px;
+  box-sizing: border-box;
+  transform: translateX(100%);
   visibility: hidden;
   transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.26s;
 }
 .stk-panel.open { transform: none; visibility: visible; transition-delay: 0s; }
+
+/* ==========================================================================
+   Holdings modal (View All -> Portfolio). Bottom sheet, like the Send menu.
+   ========================================================================== */
+html.hld-lock, html.hld-lock body { overflow: hidden; }
+.hld-root { position: fixed; inset: 0; z-index: 100; font-family: 'Geist', -apple-system, sans-serif; color: var(--hm-text, #fafafa); }
+.hld-root[hidden] { display: none; }
+.hld-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.62); opacity: 0; transition: opacity 0.22s; }
+.hld-backdrop.open { opacity: 1; }
+.hld-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto;
+  height: 72%; max-height: 640px; display: flex; flex-direction: column;
+  background: #1c1d21; border-radius: 28px 28px 0 0;
+  padding: 10px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  transform: translateY(105%); transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.hld-sheet.open { transform: none; }
+.hld-handle { width: 40px; height: 4px; border-radius: 2px; background: #45474b; margin: 0 auto 14px; flex-shrink: 0; }
+.hld-head { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: 8px; }
+.hld-title { margin: 0; font-size: 22px; font-weight: 600; }
+.hld-close { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--hm-ctrl, #23252a); color: inherit; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.hld-rows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 10px; padding-bottom: 4px; }
+.hld-rows .hm-row { padding: 10px 12px; background: var(--hm-card, #191b1f); border: 1px solid var(--hm-line); border-radius: 16px; }
+.hld-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--hm-muted, #9d9ea2); }
+.hld-empty[hidden] { display: none; }
+.hld-empty-ic { color: var(--hm-dim); }
+.hld-empty p { margin: 0; font-size: 16px; }
 .stk-title { margin: 8px 0 14px; font-size: 24px; font-weight: 700; }
 .stk-cols,
 .hm-row.stk-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 82px 78px; gap: 10px; align-items: center; }
