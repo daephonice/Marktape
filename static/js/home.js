@@ -25,6 +25,7 @@
     changeText: $('hm-change-text'),
     actions: $('hm-actions'),
     sendBtn: $('hm-send-btn'),
+    swapBtn: $('hm-swap-btn'),
     notice: $('hm-lock-notice'),
     stockRows: $('hm-stock-rows'),
     stockEmpty: $('hm-stock-empty'),
@@ -34,6 +35,7 @@
     panelEmpty: $('stk-empty'),
     tabHome: document.querySelector('[data-tab="home"]'),
     tabStocks: document.querySelector('[data-tab="stocks"]'),
+    tabSwap: document.querySelector('[data-tab="swap"]'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
     holdOpen: $('hm-hold-open'),
@@ -204,6 +206,11 @@
     els.sendBtn.classList.toggle('live', connected);
     if (connected) els.sendBtn.removeAttribute('aria-disabled');
     else els.sendBtn.setAttribute('aria-disabled', 'true');
+    if (els.swapBtn) {
+      els.swapBtn.classList.toggle('live', connected);
+      if (connected) els.swapBtn.removeAttribute('aria-disabled');
+      else els.swapBtn.setAttribute('aria-disabled', 'true');
+    }
 
     if (!connected) {
       els.total.textContent = '$0.00';
@@ -381,6 +388,7 @@
     els.tabHome.addEventListener('click', (e) => {
       e.preventDefault();
       if (panelOpen) closePanel();
+      else if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) history.back();
       else window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
@@ -390,7 +398,7 @@
     setPanel(open);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && panelOpen && !document.documentElement.classList.contains('snd-lock')) closePanel();
+    if (e.key === 'Escape' && panelOpen && !document.documentElement.classList.contains('snd-lock') && !document.documentElement.classList.contains('trd-lock')) closePanel();
   });
 
   function renderHoldings() {
@@ -614,6 +622,45 @@
     });
   });
 
+  // ---- Trade (Swap) ---------------------------------------------------------
+  function setSwapTabActive(open) {
+    if (els.tabSwap) els.tabSwap.classList.toggle('active', open);
+    if (open && els.tabHome) els.tabHome.classList.remove('active');
+    else if (!panelOpen && els.tabHome) els.tabHome.classList.add('active');
+  }
+
+  function openTrade() {
+    if (!state.address || !window.MarktapeTrade) return;
+    if (location.hash !== '#swap') history.pushState(null, '', '#swap');
+    setSwapTabActive(true);
+    window.MarktapeTrade.open({
+      getCtx: () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets }),
+      onDone: () => {
+        tickBalances();
+        setTimeout(tickBalances, 2500);
+      },
+    });
+  }
+  if (els.swapBtn) els.swapBtn.addEventListener('click', openTrade);
+  if (els.tabSwap) {
+    els.tabSwap.addEventListener('click', () => {
+      if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) history.back();
+      else openTrade();
+    });
+  }
+  window.addEventListener('popstate', () => {
+    if (location.hash !== '#swap' && window.MarktapeTrade && window.MarktapeTrade.isOpen()) window.MarktapeTrade.close();
+    if (location.hash !== '#swap') setSwapTabActive(false);
+  });
+  // trade.js closes itself on a successful swap (not via history.back()) —
+  // clean up the #swap hash + tab state so Back doesn't land on a re-opened panel.
+  setInterval(() => {
+    if (location.hash === '#swap' && window.MarktapeTrade && !window.MarktapeTrade.isOpen()) {
+      history.replaceState(null, '', location.pathname + location.search);
+      setSwapTabActive(false);
+    }
+  }, 400);
+
   // ---- Wallet -------------------------------------------------------------
   function setAddress(next) {
     if (next === state.address) return;
@@ -637,7 +684,10 @@
   // ---- Boot ---------------------------------------------------------------
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
   if (location.hash === '#stocks') setPanel(true);
+  else if (location.hash === '#swap' && state.address) openTrade();
+  else if (location.hash === '#swap') history.replaceState(null, '', location.pathname + location.search);
   renderAll();
+  setSwapTabActive(!!(window.MarktapeTrade && window.MarktapeTrade.isOpen()));
   tickPrices();
   tickBalances();
   loadNews();

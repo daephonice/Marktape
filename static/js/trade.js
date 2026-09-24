@@ -1,0 +1,582 @@
+/* Trade (Swap) panel — homepage full-panel, like #stk-panel, blue theme.
+ * Sell card / swap-direction button / Buy card (read-only) / rate+gasless+
+ * warning row / CTA. No in-site keyboard — the native mobile keyboard drives
+ * the amount input. Debounced Jupiter Ultra order fetch ("Getting Price...")
+ * while typing; warning icon opens a Price Info modal; on success the panel
+ * closes and MarktapeSend.toast() shows the shared blue toast.
+ *
+ * Host (home.js) calls MarktapeTrade.open({ getCtx, onDone }) to open the
+ * panel and MarktapeTrade.setOpen(bool) to drive it from the nav tab / URL
+ * hash, mirroring the #stk-panel pattern. getCtx() -> { address, holdings,
+ * prices, assets } (live state, same shape as send.js's getCtx).
+ *
+ * Non-custodial: /api/swap/order builds the Ultra order server-side (the API
+ * key never reaches the browser), the wallet signs, /api/swap/execute
+ * relays the signed tx to Ultra's /execute, which broadcasts it.
+ */
+(function () {
+  'use strict';
+
+  const DEBOUNCE_MS = 450;
+  const DECIMALS = { SOL: 9, USDT: 6, USDC: 6 }; // PreStocks: 6
+
+  const ICON = {
+    chevron: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+    swap: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 4 4 4-4 4"/><path d="M3 8h18"/><path d="m7 20-4-4 4-4"/><path d="M21 16H3"/></svg>',
+    info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+    close: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    external: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>',
+  };
+
+  const decimalsOf = (sym) => DECIMALS[sym] || 6;
+
+  function fmtAmount(v) {
+    if (!(v > 0)) return '0';
+    const max = v >= 1000 ? 2 : v >= 1 ? 4 : 6;
+    return v.toLocaleString('en-US', { maximumFractionDigits: max });
+  }
+
+  const usdFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+  const fmtUsd = (v) => (v > 0 && v < 0.005 ? '<$0.01' : usdFmt.format(v));
+
+  function sanitize(str, maxDec) {
+    str = str.replace(',', '.').replace(/[^\d.]/g, '');
+    const i = str.indexOf('.');
+    if (i !== -1) str = str.slice(0, i + 1) + str.slice(i + 1).replace(/\./g, '').slice(0, maxDec);
+    if (str.startsWith('.')) str = '0' + str;
+    return str.replace(/^0+(?=\d)/, '').slice(0, 14);
+  }
+
+  async function postJSON(url, body) {
+    let resp;
+    try {
+      resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch (_) {
+      throw new Error('Network error, try again');
+    }
+    let data = null;
+    try { data = await resp.json(); } catch (_) {}
+    if (!resp.ok) {
+      const detail = data && data.detail;
+      const msg = typeof detail === 'string' ? detail : (detail && detail.message) || 'Something went wrong, try again';
+      const err = new Error(msg);
+      err.deepLink = detail && detail.deepLink;
+      throw err;
+    }
+    return data;
+  }
+
+  // ---- DOM -------------------------------------------------------------------
+  let root = null;
+  const R = {};
+  let S = null; // { host, address, sell, buy, sellRaw, buyUi, quoting, order, quoteReq, note, swapping }
+
+  function logoEl(meta, size) {
+    const w = document.createElement('span');
+    w.className = 'trd-logo';
+    w.style.width = w.style.height = size + 'px';
+    if (meta && meta.image) {
+      const img = new Image();
+      img.alt = '';
+      img.src = meta.image;
+      img.addEventListener('error', () => img.remove());
+      w.appendChild(img);
+    }
+    return w;
+  }
+
+  function build() {
+    if (root) return;
+    root = document.createElement('section');
+    root.className = 'trd-panel';
+    root.hidden = true;
+    root.setAttribute('aria-label', 'Swap');
+    root.setAttribute('aria-hidden', 'true');
+    root.innerHTML = `
+      <div class="hm-col trd-col">
+        <div class="trd-card" data-side="sell">
+          <div class="trd-card-row">
+            <span class="trd-card-label">Sell</span>
+            <span class="trd-bal"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg><span class="trd-bal-sell"></span></span>
+          </div>
+          <div class="trd-card-main">
+            <button type="button" class="trd-pill" data-pill="sell" aria-label="Select token to sell"><span class="trd-pill-logo"></span><span class="trd-pill-sym"></span>${ICON.chevron}</button>
+            <input class="trd-amount" data-input="sell" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="0" aria-label="Amount to sell">
+          </div>
+          <div class="trd-card-sub" data-sub="sell"></div>
+        </div>
+
+        <button type="button" class="trd-dir" aria-label="Reverse tokens">${ICON.swap}</button>
+
+        <div class="trd-card" data-side="buy">
+          <div class="trd-card-row">
+            <span class="trd-card-label">Buy</span>
+            <span class="trd-bal"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg><span class="trd-bal-buy"></span></span>
+          </div>
+          <div class="trd-card-main">
+            <button type="button" class="trd-pill" data-pill="buy" aria-label="Select token to buy"><span class="trd-pill-logo"></span><span class="trd-pill-sym"></span>${ICON.chevron}</button>
+            <span class="trd-amount trd-amount-out" data-out></span>
+          </div>
+          <div class="trd-card-sub" data-sub="buy"></div>
+        </div>
+
+        <button type="button" class="trd-info-row" data-info-row hidden>
+          <span class="trd-rate" data-rate></span>
+          <span class="trd-info-r">
+            <span class="trd-gasless" data-gasless hidden>${ICON.info}Gasless</span>
+            <span class="trd-warn-chip" data-warn hidden></span>
+            ${ICON.chevron}
+          </span>
+        </button>
+
+        <p class="trd-note" data-note role="alert"></p>
+        <button type="button" class="trd-cta" data-cta disabled>Enter Amount</button>
+      </div>
+
+      <div class="trd-tok" data-tok hidden>
+        <div class="trd-tok-back"></div>
+        <div class="trd-tok-sheet"><div class="trd-handle"></div><h3 class="trd-title">Select token</h3><div class="trd-tok-list" data-tok-list></div></div>
+      </div>
+
+      <div class="trd-info" data-info-modal hidden>
+        <div class="trd-info-back"></div>
+        <div class="trd-info-sheet">
+          <div class="trd-handle"></div>
+          <div class="trd-info-head"><h3 class="trd-title">Price Info</h3><button type="button" class="trd-info-close" aria-label="Close">${ICON.close}</button></div>
+          <div class="trd-fee-warn" data-fee-warn hidden>
+            ${ICON.warn}
+            <span><b data-fee-title></b><small data-fee-sub></small></span>
+          </div>
+          <dl class="trd-info-list">
+            <div><dt>Rate</dt><dd data-i-rate></dd></div>
+            <div><dt>Price Impact</dt><dd data-i-impact></dd></div>
+            <div><dt>Minimum Received</dt><dd data-i-min></dd></div>
+            <div><dt>Fees</dt><dd data-i-fees></dd></div>
+            <div><dt>Routes</dt><dd data-i-routes></dd></div>
+            <div><dt>Input Mint Address</dt><dd data-i-inmint></dd></div>
+            <div><dt>Output Mint Address</dt><dd data-i-outmint></dd></div>
+          </dl>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const q = (s) => root.querySelector(s);
+    Object.assign(R, {
+      cardSell: q('[data-side="sell"]'), cardBuy: q('[data-side="buy"]'),
+      pillSell: q('[data-pill="sell"]'), pillBuy: q('[data-pill="buy"]'),
+      inputSell: q('[data-input="sell"]'), outBuy: q('[data-out]'),
+      balSell: q('.trd-bal-sell'), balBuy: q('.trd-bal-buy'),
+      subSell: q('[data-sub="sell"]'), subBuy: q('[data-sub="buy"]'),
+      dir: q('.trd-dir'), infoRow: q('[data-info-row]'), rate: q('[data-rate]'),
+      gasless: q('[data-gasless]'), warnChip: q('[data-warn]'),
+      note: q('[data-note]'), cta: q('[data-cta]'),
+      tok: q('[data-tok]'), tokBack: q('.trd-tok-back'), tokList: q('[data-tok-list]'),
+      infoModal: q('[data-info-modal]'), infoBack: q('.trd-info-back'), infoClose: q('.trd-info-close'),
+      feeWarn: q('[data-fee-warn]'), feeTitle: q('[data-fee-title]'), feeSub: q('[data-fee-sub]'),
+      iRate: q('[data-i-rate]'), iImpact: q('[data-i-impact]'), iMin: q('[data-i-min]'),
+      iFees: q('[data-i-fees]'), iRoutes: q('[data-i-routes]'), iIn: q('[data-i-inmint]'), iOut: q('[data-i-outmint]'),
+    });
+
+    R.pillSell.addEventListener('click', () => openTokens('sell'));
+    R.pillBuy.addEventListener('click', () => openTokens('buy'));
+    R.tokBack.addEventListener('click', closeTokens);
+    R.tokList.addEventListener('click', (e) => {
+      const row = e.target.closest('[data-sym]');
+      if (row) selectToken(row.dataset.sym);
+    });
+    R.inputSell.addEventListener('input', () => {
+      if (!S) return;
+      S.sellRaw = sanitize(R.inputSell.value, decimalsOf(S.sell));
+      R.inputSell.value = S.sellRaw;
+      scheduleQuote();
+      render();
+    });
+    R.dir.addEventListener('click', reverse);
+    R.infoRow.addEventListener('click', openInfo);
+    R.infoBack.addEventListener('click', closeInfo);
+    R.infoClose.addEventListener('click', closeInfo);
+    R.cta.addEventListener('click', doSwap);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !S) return;
+      if (!R.infoModal.hidden) closeInfo();
+      else if (!R.tok.hidden) closeTokens();
+    });
+    window.addEventListener('marktape:wallet', (e) => {
+      if (S && e.detail.address !== S.address) close();
+    });
+  }
+
+  // ---- Token selector ------------------------------------------------------
+  function tokenOrder(c) {
+    const syms = Object.keys(c.prices);
+    const value = (s) => (c.holdings[s] || 0) * c.prices[s].price;
+    const rank = { SOL: 0, USDC: 1, USDT: 2 };
+    return syms.sort((a, b) => {
+      const va = value(a);
+      const vb = value(b);
+      if ((va > 0) !== (vb > 0)) return va > 0 ? -1 : 1;
+      if (va > 0 && va !== vb) return vb - va;
+      const ra = a in rank ? rank[a] : 3;
+      const rb = b in rank ? rank[b] : 3;
+      return ra - rb || a.localeCompare(b);
+    });
+  }
+
+  let tokFor = null; // 'sell' | 'buy'
+  function openTokens(which) {
+    if (S.swapping) return;
+    tokFor = which;
+    const c = S.host.getCtx();
+    const other = which === 'sell' ? S.buy : S.sell;
+    R.tokList.textContent = '';
+    tokenOrder(c).forEach((sym) => {
+      if (sym === other) return; // can't pick the same token both sides
+      const meta = c.assets[sym] || { name: sym };
+      const bal = c.holdings[sym] || 0;
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.dataset.sym = sym;
+      row.className = 'trd-tok-row' + (bal > 0 ? '' : ' empty') + (sym === (which === 'sell' ? S.sell : S.buy) ? ' active' : '');
+      row.appendChild(logoEl(meta, 38));
+      const main = document.createElement('span');
+      main.className = 'trd-tok-main';
+      main.innerHTML = '<b></b><small></small>';
+      main.firstChild.textContent = sym;
+      main.lastChild.textContent = meta.name || sym;
+      row.appendChild(main);
+      const side = document.createElement('span');
+      side.className = 'trd-tok-side';
+      side.innerHTML = '<b></b><small></small>';
+      side.firstChild.textContent = bal > 0 ? fmtAmount(bal) : '';
+      side.lastChild.textContent = bal > 0 && c.prices[sym] ? fmtUsd(bal * c.prices[sym].price) : '';
+      row.appendChild(side);
+      R.tokList.appendChild(row);
+    });
+    R.tok.hidden = false;
+  }
+
+  function closeTokens() { R.tok.hidden = true; tokFor = null; }
+
+  function selectToken(sym) {
+    const which = tokFor;
+    closeTokens();
+    if (!S || !which) return;
+    if (which === 'sell') {
+      if (sym === S.sell) return;
+      S.sell = sym;
+      S.sellRaw = '';
+    } else {
+      if (sym === S.buy) return;
+      S.buy = sym;
+    }
+    resetQuote();
+    render();
+    scheduleQuote();
+  }
+
+  function reverse() {
+    if (!S || S.swapping) return;
+    const c = S.host.getCtx();
+    if (!c.prices[S.buy]) return; // need a price for the new sell side
+    [S.sell, S.buy] = [S.buy, S.sell];
+    S.sellRaw = S.order && S.order.uiOutAmount ? trimNum(S.order.uiOutAmount, decimalsOf(S.sell)) : '';
+    resetQuote();
+    render();
+    scheduleQuote();
+  }
+
+  function trimNum(v, dec) {
+    if (!(v > 0)) return '';
+    const s = v.toFixed(Math.min(dec, 8));
+    return s.replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  // ---- Quote -----------------------------------------------------------------
+  function resetQuote() {
+    if (!S) return;
+    S.order = null;
+    S.quoting = false;
+    S.note = '';
+    clearTimeout(S.quoteTimer);
+    S.quoteReq = (S.quoteReq || 0) + 1;
+  }
+
+  function scheduleQuote() {
+    if (!S) return;
+    S.order = null;
+    S.note = '';
+    clearTimeout(S.quoteTimer);
+    const amt = parseFloat(S.sellRaw);
+    if (!(amt > 0)) { S.quoting = false; render(); return; }
+    S.quoting = true;
+    render();
+    S.quoteTimer = setTimeout(fetchQuote, DEBOUNCE_MS);
+  }
+
+  async function fetchQuote() {
+    if (!S) return;
+    const sess = S;
+    const reqId = ++sess.quoteReq;
+    const c = sess.host.getCtx();
+    const inMint = (c.assets[sess.sell] || {}).mint;
+    const outMint = (c.assets[sess.buy] || {}).mint;
+    const amt = parseFloat(sess.sellRaw);
+    if (!inMint || !outMint || !(amt > 0)) { sess.quoting = false; render(); return; }
+    try {
+      const order = await postJSON('/api/swap/order', {
+        inputMint: inMint, outputMint: outMint, uiAmount: amt, taker: sess.address,
+      });
+      if (S !== sess || sess.quoteReq !== reqId) return;
+      sess.quoting = false;
+      if (!order.transaction) {
+        sess.order = null;
+        sess.note = order.deepLink ? 'No route found for this pair' : 'No route found';
+      } else {
+        sess.order = order;
+        sess.note = '';
+      }
+      render();
+    } catch (err) {
+      if (S !== sess || sess.quoteReq !== reqId) return;
+      sess.quoting = false;
+      sess.order = null;
+      sess.note = err.message || 'Could not get a price';
+      render();
+    }
+  }
+
+  // ---- Render ------------------------------------------------------------------
+  function tokenMeta(c, sym) { return c.assets[sym] || { name: sym }; }
+
+  function render() {
+    if (!S) return;
+    const c = S.host.getCtx();
+
+    const sellMeta = tokenMeta(c, S.sell);
+    if (R.pillSell.dataset.sym !== S.sell) {
+      R.pillSell.querySelector('.trd-pill-logo').replaceChildren(logoEl(sellMeta, 26));
+      R.pillSell.querySelector('.trd-pill-sym').textContent = S.sell;
+      R.pillSell.dataset.sym = S.sell;
+    }
+    const buyMeta = tokenMeta(c, S.buy);
+    if (R.pillBuy.dataset.sym !== S.buy) {
+      R.pillBuy.querySelector('.trd-pill-logo').replaceChildren(logoEl(buyMeta, 26));
+      R.pillBuy.querySelector('.trd-pill-sym').textContent = S.buy;
+      R.pillBuy.dataset.sym = S.buy;
+    }
+
+    if (R.inputSell.value !== S.sellRaw) R.inputSell.value = S.sellRaw;
+
+    const sellBal = c.holdings[S.sell] || 0;
+    const buyBal = c.holdings[S.buy] || 0;
+    R.balSell.querySelector('.trd-bal-sell') && (R.balSell.querySelector('.trd-bal-sell').textContent = fmtAmount(sellBal));
+    R.balBuy.querySelector('.trd-bal-buy') && (R.balBuy.querySelector('.trd-bal-buy').textContent = fmtAmount(buyBal));
+
+    const sellPrice = (c.prices[S.sell] || {}).price || 0;
+    const sellAmt = parseFloat(S.sellRaw) || 0;
+    R.subSell.textContent = sellAmt > 0 && sellPrice > 0 ? fmtUsd(sellAmt * sellPrice) : '';
+
+    if (S.quoting) {
+      R.outBuy.textContent = '';
+      R.outBuy.classList.add('is-loading');
+    } else {
+      R.outBuy.classList.remove('is-loading');
+      R.outBuy.textContent = S.order && S.order.uiOutAmount ? fmtAmount(S.order.uiOutAmount) : '0';
+    }
+    const buyPrice = (c.prices[S.buy] || {}).price || 0;
+    const outUi = S.order ? S.order.uiOutAmount : 0;
+    let subBuy = '';
+    if (outUi > 0 && buyPrice > 0) {
+      subBuy = fmtUsd(outUi * buyPrice);
+      if (sellAmt > 0 && sellPrice > 0) {
+        const inUsd = sellAmt * sellPrice;
+        const outUsd = outUi * buyPrice;
+        if (inUsd > 0) {
+          const diff = (outUsd / inUsd - 1) * 100;
+          if (diff < -0.005) subBuy += ` (${diff.toFixed(1).replace('-', '')}%)`;
+        }
+      }
+    }
+    R.subBuy.textContent = subBuy;
+    R.subBuy.className = 'trd-card-sub' + (subBuy.includes('(') ? ' neg' : '');
+
+    const hasOrder = !!(S.order && S.order.uiOutAmount);
+    R.infoRow.hidden = !hasOrder;
+    if (hasOrder) {
+      R.rate.textContent = S.order.rate ? `1 ${S.sell} \u2248 ${fmtAmount(S.order.rate)} ${S.buy}` : '';
+      R.gasless.hidden = !S.order.gasless;
+      const feeBps = S.order.transferFeeBps || 0;
+      if (feeBps > 0) {
+        R.warnChip.hidden = false;
+        R.warnChip.innerHTML = ICON.warn + '1';
+      } else {
+        R.warnChip.hidden = true;
+      }
+    }
+
+    R.note.textContent = S.swapping ? '' : (S.note || '');
+
+    renderCta();
+  }
+
+  function renderCta() {
+    const b = R.cta;
+    if (S.swapping) {
+      if (b.dataset.busy !== '1') {
+        b.dataset.busy = '1';
+        b.innerHTML = '<span class="trd-dots"><i></i><i></i><i></i><i></i></span>Swapping';
+      }
+      b.disabled = true;
+      b.classList.add('busy');
+      return;
+    }
+    if (b.dataset.busy === '1') { b.dataset.busy = ''; b.classList.remove('busy'); }
+
+    const amt = parseFloat(S.sellRaw) || 0;
+    const c = S.host.getCtx();
+    const bal = c.holdings[S.sell] || 0;
+    if (!(amt > 0)) { b.textContent = 'Enter Amount'; b.disabled = true; return; }
+    if (amt > bal * (1 + 1e-9)) { b.textContent = 'Insufficient Balance'; b.disabled = true; return; }
+    if (S.quoting) { b.textContent = 'Getting Price....'; b.disabled = true; return; }
+    if (!S.order || !S.order.uiOutAmount) { b.textContent = 'Swap'; b.disabled = true; return; }
+    b.textContent = 'Swap';
+    b.disabled = false;
+  }
+
+  // ---- Price Info modal ------------------------------------------------------
+  const shortMint = (m) => (m && m.length > 8 ? m.slice(0, 4) + '...' + m.slice(-4) : m || '');
+
+  function openInfo() {
+    if (!S || !S.order) return;
+    const o = S.order;
+    const feeBps = o.transferFeeBps || 0;
+    R.feeWarn.hidden = feeBps <= 0;
+    if (feeBps > 0) {
+      const pct = (feeBps / 100).toFixed(feeBps % 100 === 0 ? 0 : 2);
+      R.feeTitle.textContent = `${pct}% Transfer Fees`;
+      R.feeSub.textContent = `This token has a transfer fee of ${pct}%`;
+    }
+    R.iRate.textContent = o.rate ? `1 ${S.sell} \u2248 ${fmtAmount(o.rate)} ${S.buy}` : '\u2014';
+    R.iImpact.textContent = o.priceImpactPct !== undefined && o.priceImpactPct !== null
+      ? `< ${(Math.abs(parseFloat(o.priceImpactPct)) || 0).toFixed(2)}%` : '\u2014';
+    R.iMin.textContent = o.uiMinReceived ? `${fmtAmount(o.uiMinReceived)} ${S.buy}` : '\u2014';
+    const feeBpsTotal = o.feeBps || 0;
+    R.iFees.textContent = feeBpsTotal ? `${(feeBpsTotal / 100).toFixed(1)}%` : (feeBps ? `${(feeBps / 100).toFixed(1)}%` : '\u2014');
+    R.iRoutes.textContent = (o.routes && o.routes.length) ? o.routes.join(', ') : '\u2014';
+    const c = S.host.getCtx();
+    R.iIn.innerHTML = '';
+    R.iIn.appendChild(document.createTextNode(shortMint((c.assets[S.sell] || {}).mint) + ' '));
+    R.iIn.insertAdjacentHTML('beforeend', ICON.external);
+    R.iOut.innerHTML = '';
+    R.iOut.appendChild(document.createTextNode(shortMint((c.assets[S.buy] || {}).mint) + ' '));
+    R.iOut.insertAdjacentHTML('beforeend', ICON.external);
+
+    R.infoModal.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      R.infoBack.classList.add('open');
+      R.infoModal.querySelector('.trd-info-sheet').classList.add('open');
+    }));
+  }
+
+  function closeInfo() {
+    R.infoBack.classList.remove('open');
+    const sheet = R.infoModal.querySelector('.trd-info-sheet');
+    sheet.classList.remove('open');
+    setTimeout(() => { R.infoModal.hidden = true; }, 260);
+  }
+
+  // ---- Swap ------------------------------------------------------------------
+  async function doSwap() {
+    if (!S || S.swapping || !S.order || !S.order.transaction) return;
+    const sess = S;
+    sess.swapping = true;
+    sess.note = '';
+    render();
+    try {
+      let signed;
+      try {
+        signed = await window.MarktapeWallet.signTransactionForSend(sess.order.transaction);
+      } catch (err) {
+        const rejected = (err && err.code === 4001) || /reject|declin|denied|cancel/i.test(String((err && err.message) || ''));
+        throw new Error(rejected ? 'Cancelled' : 'Wallet could not sign the transaction');
+      }
+      if (S !== sess) return;
+
+      if (!signed.signedTransactionBase64) {
+        // Wallet could only sign-and-send itself (already broadcast) — nothing
+        // to relay through Ultra's /execute.
+      } else {
+        const res = await postJSON('/api/swap/execute', {
+          signedTransaction: signed.signedTransactionBase64,
+          requestId: sess.order.requestId,
+        });
+        if (res.status && res.status !== 'Success' && res.status !== 'success') {
+          throw new Error('Swap failed on-chain, please try again');
+        }
+      }
+
+      const host = sess.host;
+      const outAmt = sess.order.uiOutAmount;
+      const buySym = sess.buy;
+      if (S === sess) close();
+      if (window.MarktapeSend && window.MarktapeSend.toast) {
+        window.MarktapeSend.toast(`Swapped for ${fmtAmount(outAmt)} ${buySym}`);
+      }
+      if (host.onDone) host.onDone();
+    } catch (err) {
+      if (S !== sess) return;
+      sess.swapping = false;
+      sess.note = err.message || 'Something went wrong';
+      render();
+    }
+  }
+
+  // ---- Public ------------------------------------------------------------------
+  function pickDefaultSell(c) {
+    const value = (s) => (c.holdings[s] || 0) * (c.prices[s] ? c.prices[s].price : 0);
+    if (value('SOL') > 0) return 'SOL';
+    const held = Object.keys(c.prices).filter((s) => value(s) > 0).sort((a, b) => value(b) - value(a));
+    return held[0] || 'SOL';
+  }
+
+  function pickDefaultBuy(c, sell) {
+    const stock = Object.keys(c.prices).find((s) => c.assets[s] && c.assets[s].kind === 'stock' && s !== sell);
+    return stock || Object.keys(c.prices).find((s) => s !== sell) || sell;
+  }
+
+  function open(host) {
+    const c = host.getCtx();
+    if (!c.address || !Object.keys(c.prices).length) return;
+    build();
+    const sell = pickDefaultSell(c);
+    S = {
+      host, address: c.address, sell, buy: pickDefaultBuy(c, sell),
+      sellRaw: '', order: null, quoting: false, quoteTimer: null, quoteReq: 0,
+      note: '', swapping: false,
+    };
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    document.documentElement.classList.add('trd-lock');
+    render();
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('open')));
+  }
+
+  function close() {
+    if (!S) return;
+    clearTimeout(S.quoteTimer);
+    S = null;
+    R.inputSell.blur();
+    R.tok.hidden = true;
+    R.infoModal.hidden = true;
+    root.classList.remove('open');
+    root.setAttribute('aria-hidden', 'true');
+    document.documentElement.classList.remove('trd-lock');
+    setTimeout(() => { if (!S) root.hidden = true; }, 260);
+  }
+
+  function isOpen() { return !!S; }
+
+  window.MarktapeTrade = { open, close, isOpen };
+})();
