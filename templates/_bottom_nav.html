@@ -2,7 +2,8 @@
    Home and Stocks are live (home.js drives the Stocks panel); Swap / Portfolio are inert for now. #}
 <nav class="hm-nav" aria-label="Primary">
   <a class="hm-tab{{ ' active' if nav_active == 'home' }}" href="/" data-tab="home">
-    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.2 3.4 10.4c-.3.2-.4.5-.4.8V20a1 1 0 0 0 1 1h5.2v-6.2h6.6V21H20a1 1 0 0 0 1-1v-8.8c0-.3-.1-.6-.4-.8z"/></svg>
+    <svg class="hm-tab-ic-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.4 12 3.2l9 7.2V20a1 1 0 0 1-1 1h-5.2v-6.2H9.2V21H4a1 1 0 0 1-1-1z"/></svg>
+    <svg class="hm-tab-ic-fill" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.4 10.4c-.3.2-.4.5-.4.8V20a1 1 0 0 0 1 1h5.2v-6.2h6.6V21H20a1 1 0 0 0 1-1v-8.8c0-.3-.1-.6-.4-.8z"/></svg>
     <span>Home</span>
   </a>
   <button class="hm-tab{{ ' active' if nav_active == 'stocks' }}" type="button" data-tab="stocks">
