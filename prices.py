@@ -93,27 +93,29 @@ def _touch() -> None:
 # Refreshers
 # ---------------------------------------------------------------------------
 async def _refresh_stocks(client: httpx.AsyncClient) -> None:
-    try:
-        records = await prestocks.fetch_prestocks(client)
-    except Exception:
-        _warn("prestocks", "prices: PreStocks fetch failed, serving last-good prices")
+    # Reuse board.py's snapshot (refreshed every BOARD_REFRESH_SECONDS) instead
+    # of hitting PreStocks again here — polling PreStocks every second on top
+    # of board's own loop doubles/triples upstream load and trips its 429
+    # rate limit, which is what was breaking prices/board/swap together.
+    records = prestocks.get_cached_snapshot().get("tokens") or []
+    if not records:
         return
     for r in records:
-        price = float(r["tokenPrice"])
-        if price <= 0:
+        price = r.get("tokenPrice")
+        if not isinstance(price, (int, float)) or price <= 0:
             continue
         supply = r.get("supply")
-        url = r.get("external_url")
+        url = r.get("externalUrl")
         desc = r.get("description")
         _stocks[r["symbol"].upper()] = {
             "symbol": r["symbol"],
-            "mint": r["contract_address"],
+            "mint": r["mint"],
             "name": r.get("name") or r["symbol"],
             "image": r.get("image"),
             "description": desc if isinstance(desc, str) and desc.strip() else None,
             "url": url if isinstance(url, str) and url.startswith(("https://", "http://")) else None,
             "supply": float(supply) if isinstance(supply, (int, float)) else None,
-            "price": price,
+            "price": float(price),
         }
     _touch()
 

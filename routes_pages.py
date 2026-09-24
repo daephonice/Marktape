@@ -25,6 +25,16 @@ async def home_page(request: Request):
     return templates.TemplateResponse(request, "home.html", {})
 
 
+@router.get("/stocks", response_class=HTMLResponse)
+async def stocks_page(request: Request):
+    return templates.TemplateResponse(request, "home.html", {"open_panel": "stocks"})
+
+
+@router.get("/swap", response_class=HTMLResponse)
+async def swap_page(request: Request):
+    return templates.TemplateResponse(request, "home.html", {"open_panel": "swap"})
+
+
 @router.get("/t/{symbol}", response_class=HTMLResponse)
 async def token_page(request: Request, symbol: str):
     asset = prices.get_asset(symbol)
