@@ -118,7 +118,7 @@
 
   function badgeEl() {
     const badge = h('span', 'hm-badge');
-    badge.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l5-6 4 4 7-8"/></svg>';
+    badge.innerHTML = '<img src="/static/img/prestocks.png" alt="" width="18" height="18">';
     return badge;
   }
 
