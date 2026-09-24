@@ -616,6 +616,7 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
    Lives on body.hm. trade.js.
    ========================================================================== */
 html.trd-lock, html.trd-lock body { overflow: hidden; }
+html.trd-lock .hm-nav, html.stk-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 
 .trd-panel {
   position: fixed;
@@ -702,7 +703,7 @@ html.trd-lock, html.trd-lock body { overflow: hidden; }
 .trd-tok-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); }
 .trd-tok-sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto; max-height: 72%; overflow-y: auto; background: #1c1d21; border-radius: 28px 28px 0 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
 .trd-tok-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font-family: inherit; }
-.trd-tok-row.empty { opacity: 0.55; }
+
 .trd-tok-row.active .trd-tok-main b { color: var(--accent); }
 .trd-tok-main, .trd-tok-side { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .trd-tok-main { flex: 1; }
