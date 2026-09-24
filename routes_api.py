@@ -116,9 +116,9 @@ async def swap_order(body: SwapOrderRequest):
     amount_raw = multiplier_mod.to_raw_amount(body.uiAmount, in_info["decimals"], in_info["multiplier"])
 
     try:
-        order = await jupiter.get_ultra_order(body.inputMint, body.outputMint, amount_raw, body.taker)
+        order = await jupiter.get_order(body.inputMint, body.outputMint, amount_raw, body.taker)
     except Exception:
-        log.warning("swap_order: ultra order failed", exc_info=True)
+        log.warning("swap_order: no provider could build a route", exc_info=True)
         raise HTTPException(
             status_code=502,
             detail={
@@ -131,8 +131,8 @@ async def swap_order(body: SwapOrderRequest):
         order["deepLink"] = jupiter.jup_deep_link(body.inputMint, body.outputMint)
         return order
 
-    # UI-friendly fields for the panel + Price Info modal. Raw Ultra fields
-    # are left in place too, in case the frontend ever wants them.
+    # UI-friendly fields for the panel + Price Info modal. Raw provider
+    # fields are left in place too, in case the frontend ever wants them.
     out_raw = order.get("outAmount")
     min_raw = order.get("otherAmountThreshold")
     in_ui = body.uiAmount
@@ -150,20 +150,24 @@ async def swap_order(body: SwapOrderRequest):
         if step.get("swapInfo", {}).get("label") or step.get("label")
     ]
     order["transferFeeBps"] = max(in_info["transferFeeBps"], out_info["transferFeeBps"])
+    order["provider"] = order.get("_provider", "ultra")
     return order
 
 
 class SwapExecuteRequest(BaseModel):
     signedTransaction: str
-    requestId: str
+    requestId: str | None = None
+    provider: str = "ultra"
 
 
 @router.post("/swap/execute")
 async def swap_execute(body: SwapExecuteRequest):
     try:
-        result = await jupiter.execute_ultra_order(body.signedTransaction, body.requestId)
+        result = await jupiter.execute_order(
+            {"_provider": body.provider, "requestId": body.requestId}, body.signedTransaction
+        )
     except Exception:
-        log.warning("swap_execute: ultra execute failed", exc_info=True)
+        log.warning("swap_execute: %s relay failed", body.provider, exc_info=True)
         raise HTTPException(status_code=502, detail="Execution failed")
     return result
 
