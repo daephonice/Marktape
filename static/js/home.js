@@ -5,7 +5,7 @@
  * Values are computed here: balance = sum(amount * price) over ALL holdings;
  * Portfolio shows the top 3 by USD value. The Stocks card shows the 3 PreStocks
  * with the biggest 24h move (re-ranked every 30s); "View all" / the Stocks tab
- * open the full Stocks panel (#stocks in the URL so Back returns to it).
+ * open the full Stocks panel (/stocks in the URL so Back returns to it).
  * Every row links to its token page (/t/SYMBOL). Send opens the send flow
  * (send.js); Swap / Lend are inert for now.
  */
@@ -364,8 +364,8 @@
 
   function openPanel() {
     if (panelOpen) return;
-    if (location.hash !== '#stocks') {
-      history.pushState(null, '', '#stocks');
+    if (location.pathname !== '/stocks') {
+      history.pushState(null, '', '/stocks');
       panelPushed = true;
     }
     setPanel(true);
@@ -377,23 +377,29 @@
       panelPushed = false;
       history.back(); // popstate closes it
     } else {
-      history.replaceState(null, '', location.pathname + location.search);
+      history.replaceState(null, '', '/');
       setPanel(false);
     }
   }
 
-  els.stocksOpen.addEventListener('click', openPanel);
-  if (els.tabStocks) els.tabStocks.addEventListener('click', () => (panelOpen ? closePanel() : openPanel()));
+  els.stocksOpen.addEventListener('click', (e) => { e.preventDefault(); openPanel(); });
+  if (els.tabStocks) {
+    els.tabStocks.addEventListener('click', (e) => {
+      e.preventDefault();
+      panelOpen ? closePanel() : openPanel();
+    });
+  }
   if (els.tabHome) {
     els.tabHome.addEventListener('click', (e) => {
       e.preventDefault();
       if (panelOpen) closePanel();
       else if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) history.back();
       else window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (location.pathname !== '/') history.replaceState(null, '', '/');
     });
   }
   window.addEventListener('popstate', () => {
-    const open = location.hash === '#stocks';
+    const open = location.pathname === '/stocks';
     if (!open) panelPushed = false;
     setPanel(open);
   });
@@ -631,7 +637,7 @@
 
   function openTrade() {
     if (!state.address || !window.MarktapeTrade) return;
-    if (location.hash !== '#swap') history.pushState(null, '', '#swap');
+    if (location.pathname !== '/swap') history.pushState(null, '', '/swap');
     setSwapTabActive(true);
     window.MarktapeTrade.open({
       getCtx: () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets }),
@@ -643,20 +649,21 @@
   }
   if (els.swapBtn) els.swapBtn.addEventListener('click', openTrade);
   if (els.tabSwap) {
-    els.tabSwap.addEventListener('click', () => {
+    els.tabSwap.addEventListener('click', (e) => {
+      e.preventDefault();
       if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) history.back();
       else openTrade();
     });
   }
   window.addEventListener('popstate', () => {
-    if (location.hash !== '#swap' && window.MarktapeTrade && window.MarktapeTrade.isOpen()) window.MarktapeTrade.close();
-    if (location.hash !== '#swap') setSwapTabActive(false);
+    if (location.pathname !== '/swap' && window.MarktapeTrade && window.MarktapeTrade.isOpen()) window.MarktapeTrade.close();
+    if (location.pathname !== '/swap') setSwapTabActive(false);
   });
   // trade.js closes itself on a successful swap (not via history.back()) —
-  // clean up the #swap hash + tab state so Back doesn't land on a re-opened panel.
+  // clean up the /swap URL + tab state so Back doesn't land on a re-opened panel.
   setInterval(() => {
-    if (location.hash === '#swap' && window.MarktapeTrade && !window.MarktapeTrade.isOpen()) {
-      history.replaceState(null, '', location.pathname + location.search);
+    if (location.pathname === '/swap' && window.MarktapeTrade && !window.MarktapeTrade.isOpen()) {
+      history.replaceState(null, '', '/');
       setSwapTabActive(false);
     }
   }, 400);
@@ -683,9 +690,10 @@
 
   // ---- Boot ---------------------------------------------------------------
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
-  if (location.hash === '#stocks') setPanel(true);
-  else if (location.hash === '#swap' && state.address) openTrade();
-  else if (location.hash === '#swap') history.replaceState(null, '', location.pathname + location.search);
+  const bootPanel = window.__MKT_OPEN_PANEL__ || (location.pathname === '/stocks' ? 'stocks' : location.pathname === '/swap' ? 'swap' : '');
+  if (bootPanel === 'stocks') setPanel(true);
+  else if (bootPanel === 'swap' && state.address) openTrade();
+  else if (bootPanel === 'swap') history.replaceState(null, '', '/');
   renderAll();
   setSwapTabActive(!!(window.MarktapeTrade && window.MarktapeTrade.isOpen()));
   tickPrices();
