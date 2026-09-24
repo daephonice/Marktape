@@ -120,8 +120,9 @@
 <footer class="hm-col hm-footer">
   <p>Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. Marktape does not custody funds.</p>
 </footer>
-{% set nav_active = 'home' %}
+{% set nav_active = open_panel or 'home' %}
 {% include "_bottom_nav.html" %}
+<script>window.__MKT_OPEN_PANEL__ = {{ (open_panel or '')|tojson }};</script>
 {% endblock %}
 
 {% block scripts %}

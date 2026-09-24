@@ -6,14 +6,14 @@
     <svg class="hm-tab-ic-fill" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.4 10.4c-.3.2-.4.5-.4.8V20a1 1 0 0 0 1 1h5.2v-6.2h6.6V21H20a1 1 0 0 0 1-1v-8.8c0-.3-.1-.6-.4-.8z"/></svg>
     <span>Home</span>
   </a>
-  <button class="hm-tab{{ ' active' if nav_active == 'stocks' }}" type="button" data-tab="stocks">
+  <a class="hm-tab{{ ' active' if nav_active == 'stocks' }}" href="/stocks" data-tab="stocks">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
     <span>Stocks</span>
-  </button>
-  <button class="hm-tab{{ ' active' if nav_active == 'swap' }}" type="button" data-tab="swap">
+  </a>
+  <a class="hm-tab{{ ' active' if nav_active == 'swap' }}" href="/swap" data-tab="swap">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
     <span>Swap</span>
-  </button>
+  </a>
   <span class="hm-tab{{ ' active' if nav_active == 'lend' }}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg>
     <span>Lend</span>
