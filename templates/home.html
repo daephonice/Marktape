@@ -46,7 +46,7 @@
       <span class="hm-action-label">Send</span>
     </div>
     <div class="hm-action">
-      <button class="hm-action-btn" type="button" aria-disabled="true" aria-label="Swap">
+      <button class="hm-action-btn" id="hm-swap-btn" type="button" aria-disabled="true" aria-label="Swap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
       </button>
       <span class="hm-action-label">Swap</span>
@@ -126,5 +126,6 @@
 
 {% block scripts %}
 <script src="/static/js/send.js?v={{ static_v('js/send.js') }}"></script>
+<script src="/static/js/trade.js?v={{ static_v('js/trade.js') }}"></script>
 <script src="/static/js/home.js?v={{ static_v('js/home.js') }}"></script>
 {% endblock %}
