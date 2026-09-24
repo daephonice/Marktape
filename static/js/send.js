@@ -1,10 +1,12 @@
-/* Send flow (homepage): sheet "Send to address" -> sheet "Receiving address"
- * -> full amount panel -> blue toast.
+/* Send flow (homepage + token page): sheet "Send to address" -> sheet
+ * "Receiving address" -> full amount panel -> blue toast.
  *
  * The server builds the transfer and relays it through its RPC
  * (/api/send/build, /api/send/submit); the wallet only signs.
- * Host (home.js) calls MarktapeSend.open({ getCtx, onSent }) where
- * getCtx() -> { address, holdings, prices, assets } (live state).
+ * Host (home.js / token.js) calls MarktapeSend.open({ getCtx, onSent, symbol? })
+ * where getCtx() -> { address, holdings, prices, assets } (live state) and
+ * `symbol` (optional) preselects the token. MarktapeSend.toast(text) shows the
+ * shared blue success toast (also used by swap.js).
  */
 (function () {
   'use strict';
@@ -489,7 +491,8 @@
     const value = (s) => (c.holdings[s] || 0) * c.prices[s].price;
     const held = Object.keys(c.prices).filter((s) => value(s) > 0).sort((a, b) => value(b) - value(a));
     S = {
-      host, address: c.address, stage: 'menu', to: '', sym: value('SOL') > 0 || !held.length ? 'SOL' : held[0],
+      host, address: c.address, stage: 'menu', to: '',
+      sym: host.symbol && c.prices[host.symbol] ? host.symbol : value('SOL') > 0 || !held.length ? 'SOL' : held[0],
       mode: 'coin', raw: '', max: false, sending: false, tick: null,
     };
     root.hidden = false;
@@ -502,5 +505,5 @@
     }));
   }
 
-  window.MarktapeSend = { open };
+  window.MarktapeSend = { open, toast };
 })();

@@ -3,8 +3,11 @@
  *   /api/balances/{addr}  wallet holdings across the 11 accepted assets
  *   /api/news             news feed
  * Values are computed here: balance = sum(amount * price) over ALL holdings;
- * Portfolio shows the top 3 by USD value. Send opens the send flow (send.js);
- * Swap / Lend are inert for now.
+ * Portfolio shows the top 3 by USD value. The Stocks card shows the 3 PreStocks
+ * with the biggest 24h move (re-ranked every 30s); "View all" / the Stocks tab
+ * open the full Stocks panel (#stocks in the URL so Back returns to it).
+ * Every row links to its token page (/t/SYMBOL). Send opens the send flow
+ * (send.js); Swap / Lend are inert for now.
  */
 (function () {
   const PRICE_MS = 1000;
@@ -12,6 +15,8 @@
   const NEWS_MS = 60000;
   const ASSETS_RETRY_MS = 3000;
   const LIST_MAX = 3;
+  const TOP_REFRESH_MS = 30000;
+  const NON_STOCKS = new Set(['SOL', 'USDT', 'USDC']);
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -21,8 +26,14 @@
     actions: $('hm-actions'),
     sendBtn: $('hm-send-btn'),
     notice: $('hm-lock-notice'),
-    watchRows: $('hm-watch-rows'),
-    watchEmpty: $('hm-watch-empty'),
+    stockRows: $('hm-stock-rows'),
+    stockEmpty: $('hm-stock-empty'),
+    stocksOpen: $('hm-stocks-open'),
+    panel: $('stk-panel'),
+    panelRows: $('stk-rows'),
+    panelEmpty: $('stk-empty'),
+    tabHome: document.querySelector('[data-tab="home"]'),
+    tabStocks: document.querySelector('[data-tab="stocks"]'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
     newsList: $('hm-news-list'),
@@ -34,7 +45,9 @@
     holdings: null, // { SYMBOL: amount } once loaded
     prices: {},     // { SYMBOL: { price, change24h, mc? } }
     assets: {},     // { SYMBOL: { name, image, kind } }
-    watchlist: [],  // up to 3 symbols — wired up when the watchlist feature ships
+    loaded: false,  // first /api/prices response received
+    top: [],        // the 3 stocks shown on the home card
+    topAt: 0,       // when `top` was last ranked
     news: null,     // null = loading, [] = none
   };
 
@@ -101,6 +114,12 @@
     use.setAttribute('href', '#' + id);
     svg.appendChild(use);
     return svg;
+  }
+
+  function badgeEl() {
+    const badge = h('span', 'hm-badge');
+    badge.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l5-6 4 4 7-8"/></svg>';
+    return badge;
   }
 
   function meta(sym) {
@@ -198,19 +217,13 @@
     els.change.style.visibility = 'visible';
   }
 
-  // ---- Rows (watchlist / portfolio) -----------------------------------------
+  // ---- Rows (stocks / portfolio) -------------------------------------------
   function rowShell(sym, opts) {
-    const linked = meta(sym).kind === 'stock';
-    const row = h(linked ? 'a' : 'div', 'hm-row');
-    if (linked) row.href = '/t/' + encodeURIComponent(sym);
-    if (opts.star) row.appendChild(icon('i-star', 18, 'hm-star'));
+    const row = h('a', 'hm-row');
+    row.href = '/t/' + encodeURIComponent(sym);
 
-    const lg = logo(sym, 36);
-    if (opts.badge) {
-      const badge = h('span', 'hm-badge');
-      badge.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l5-6 4 4 7-8"/></svg>';
-      lg.appendChild(badge);
-    }
+    const lg = logo(sym, opts.size || 36);
+    if (opts.badge) lg.appendChild(badgeEl());
     row.appendChild(lg);
 
     const main = h('div', 'hm-row-main');
@@ -228,11 +241,34 @@
     return row;
   }
 
-  function buildWatchRow(sym) {
-    return rowShell(sym, { star: true, badge: true });
+  function stockSyms() {
+    return Object.keys(state.prices).filter((sym) => !NON_STOCKS.has(sym));
   }
 
-  function updateWatchRow(node, sym) {
+  const mcOf = (sym) => (state.prices[sym] && state.prices[sym].mc) || 0;
+
+  // Top 3 by absolute 24h move (market cap breaks ties / covers missing history).
+  // Re-ranked at most every TOP_REFRESH_MS so the card doesn't jump every second.
+  function pickTop() {
+    const fresh = Date.now() - state.topAt < TOP_REFRESH_MS;
+    if (fresh && state.top.length && state.top.every((s) => state.prices[s])) return state.top;
+    const syms = stockSyms();
+    if (!syms.length) return [];
+    const move = (s) => {
+      const c = state.prices[s].change24h;
+      return c === null || c === undefined ? -1 : Math.abs(c);
+    };
+    syms.sort((a, b) => move(b) - move(a) || mcOf(b) - mcOf(a) || a.localeCompare(b));
+    state.top = syms.slice(0, LIST_MAX);
+    state.topAt = Date.now();
+    return state.top;
+  }
+
+  function buildStockRow(sym) {
+    return rowShell(sym, { badge: true });
+  }
+
+  function updateStockRow(node, sym) {
     const p = state.prices[sym];
     const sub = node.querySelector('.hm-sub');
     sub.textContent = p && p.mc ? `${fmtCompact(p.mc)} MC` : '';
@@ -259,12 +295,95 @@
     node.querySelector('.hm-side-bot').textContent = fmtAmount(item.amount);
   }
 
-  function renderWatch() {
-    const syms = state.address ? state.watchlist.slice(0, LIST_MAX) : [];
-    syncList(els.watchRows, syms, (s) => s, buildWatchRow, updateWatchRow);
-    els.watchEmpty.hidden = syms.length > 0;
-    els.watchEmpty.textContent = state.address ? 'No Watchlist yet' : 'Connect wallet';
+  function renderStocks() {
+    const top = pickTop();
+    syncList(els.stockRows, top, (s) => s, buildStockRow, updateStockRow);
+    els.stockEmpty.hidden = top.length > 0;
+    els.stockEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
+    if (panelOpen) renderPanel();
   }
+
+  // ---- Stocks panel (full list, sorted by market cap) -----------------------
+  let panelOpen = false;
+  let panelPushed = false;
+
+  function buildPanelRow(sym) {
+    const row = rowShell(sym, { badge: true, size: 40 });
+    row.classList.add('stk-row');
+    const side = row.querySelector('.hm-row-side');
+    side.className = 'stk-price-col';
+    side.replaceChildren(h('div', 'hm-side-top stk-price'), h('div', 'hm-side-bot stk-chg'));
+    row.appendChild(h('div', 'hm-side-top stk-mc'));
+    return row;
+  }
+
+  function updatePanelRow(node, sym) {
+    const p = state.prices[sym];
+    node.querySelector('.hm-sub').textContent = meta(sym).name || sym;
+    node.querySelector('.stk-price').textContent = p ? fmtPrice(p.price) : '—';
+    const chg = node.querySelector('.stk-chg');
+    chg.className = 'hm-side-bot stk-chg';
+    setPct(chg, p ? p.change24h : null);
+    node.querySelector('.stk-mc').textContent = p && p.mc ? fmtCompact(p.mc) : '—';
+  }
+
+  function renderPanel() {
+    const syms = stockSyms().sort((a, b) => mcOf(b) - mcOf(a) || a.localeCompare(b));
+    syncList(els.panelRows, syms, (s) => s, buildPanelRow, updatePanelRow);
+    els.panelEmpty.hidden = syms.length > 0;
+    els.panelEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
+  }
+
+  function setPanel(open) {
+    panelOpen = open;
+    els.panel.classList.toggle('open', open);
+    els.panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    document.documentElement.classList.toggle('stk-lock', open);
+    if (els.tabHome) els.tabHome.classList.toggle('active', !open);
+    if (els.tabStocks) els.tabStocks.classList.toggle('active', open);
+    if (open) {
+      renderPanel();
+      els.panel.scrollTop = 0;
+    }
+  }
+
+  function openPanel() {
+    if (panelOpen) return;
+    if (location.hash !== '#stocks') {
+      history.pushState(null, '', '#stocks');
+      panelPushed = true;
+    }
+    setPanel(true);
+  }
+
+  function closePanel() {
+    if (!panelOpen) return;
+    if (panelPushed) {
+      panelPushed = false;
+      history.back(); // popstate closes it
+    } else {
+      history.replaceState(null, '', location.pathname + location.search);
+      setPanel(false);
+    }
+  }
+
+  els.stocksOpen.addEventListener('click', openPanel);
+  if (els.tabStocks) els.tabStocks.addEventListener('click', () => (panelOpen ? closePanel() : openPanel()));
+  if (els.tabHome) {
+    els.tabHome.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (panelOpen) closePanel();
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  window.addEventListener('popstate', () => {
+    const open = location.hash === '#stocks';
+    if (!open) panelPushed = false;
+    setPanel(open);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panelOpen && !document.documentElement.classList.contains('snd-lock')) closePanel();
+  });
 
   function renderHoldings() {
     const rows = state.address && state.holdings ? computePortfolio().rows.slice(0, LIST_MAX) : [];
@@ -346,7 +465,7 @@
   // ---- Render orchestration -----------------------------------------------
   function renderAll() {
     renderBalance();
-    renderWatch();
+    renderStocks();
     renderHoldings();
     renderNews();
   }
@@ -367,7 +486,7 @@
       const data = await getJSON('/api/assets');
       state.assets = data.assets || {};
       // logos are baked into rows on creation — rebuild so late metadata shows up
-      [els.watchRows, els.holdRows, els.newsList].forEach((c) => { c.textContent = ''; });
+      [els.stockRows, els.panelRows, els.holdRows, els.newsList].forEach((c) => { c.textContent = ''; });
       renderAll();
     } catch (err) { /* retry on a later tick */ }
   }
@@ -379,6 +498,7 @@
     try {
       const data = await getJSON('/api/prices');
       state.prices = data.prices || {};
+      state.loaded = true;
       await ensureAssets();
       renderAll();
     } catch (err) { /* keep last prices */ } finally {
@@ -446,6 +566,7 @@
 
   // ---- Boot ---------------------------------------------------------------
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
+  if (location.hash === '#stocks') setPanel(true);
   renderAll();
   tickPrices();
   tickBalances();

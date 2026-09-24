@@ -1,302 +1,339 @@
+/* Token page (/t/SYMBOL). Same data sources as the homepage:
+ *   /api/prices           shared price cache (polled every second)
+ *   /api/balances/{addr}  wallet holdings
+ *   /api/chart/{symbol}   price history for the chart
+ * Send opens send.js on this page; Buy / Sell open swap.js (frontend only for now).
+ * With no holdings only the Buy button shows.
+ */
 (function () {
+  'use strict';
   const page = document.getElementById('token-page');
   if (!page) return;
 
   const SYMBOL = page.dataset.symbol;
-  const MINT = page.dataset.mint;
-  const MARK_PRICE = parseFloat(page.dataset.markPrice) || null;
-  const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-  const DEFAULT_BUY_USD = 100;
-  const QUOTE_FRESH_MS = 15000;
-  const QUOTE_REFRESH_MS = 10000;
+  const PRICE_MS = 1000;
+  const BALANCE_MS = 6000;
+  const CHART_MS = 30000;
+  const UP = '#4ade80';
+  const DOWN = '#fb7185';
 
-  let side = 'buy'; // buy: USDC -> PreStock, sell: PreStock -> USDC
-  let lastQuote = null;
-  let quoteFetchedAt = 0;
-  let quoteTimer = null;
-  let wallet = null;
-  let range = '1D';
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    price: $('tk-price'), chg: $('tk-chg'), chgAbs: $('tk-chg-abs'), chgPct: $('tk-chg-pct'),
+    stat: $('tk-stat'), mc: $('tk-mc'),
+    plot: $('tk-plot'), axis: $('tk-axis'), noHist: $('tk-nohist'), ranges: $('tk-ranges'),
+    pos: $('tk-pos'), posVal: $('tk-pos-val'), posAmt: $('tk-pos-amt'), posDelta: $('tk-pos-delta'), posPct: $('tk-pos-pct'), posPnl: $('tk-pos-pnl'),
+    bar: $('tk-bar'), send: $('tk-send'), sell: $('tk-sell'), buy: $('tk-buy'),
+    back: $('tk-back'), share: $('tk-share'), mint: $('tk-mint'), mintText: $('tk-mint-text'),
+    about: $('tk-about'), aboutText: $('tk-about-text'), more: $('tk-readmore'),
+  };
 
-  const amountInput = document.getElementById('swap-amount');
-  const unitLabel = document.getElementById('swap-unit');
-  const unitFieldLabel = document.getElementById('swap-unit-label');
-  const quoteBox = document.getElementById('quote-box');
-  const confirmBtn = document.getElementById('confirm-swap-btn');
-  const noteEl = document.getElementById('swap-note');
-  const resultEl = document.getElementById('swap-result');
-  const noRouteEl = document.getElementById('mkt-tk-noroute');
-  const jupFallback = document.getElementById('jup-fallback-link');
-  const connectBtn = document.getElementById('connect-wallet-btn');
-  const walletSection = document.getElementById('wallet-section');
-  const walletAddrEl = document.getElementById('wallet-address');
+  const state = {
+    address: null,
+    holdings: null, // { SYMBOL: amount } once loaded
+    prices: {},
+    assets: {},
+    range: '1D',
+    points: [],     // [[ms, price], ...] history for the selected range
+  };
 
-  // ---- Side toggle -------------------------------------------------------
-  function setSide(newSide) {
-    side = newSide;
-    document.querySelectorAll('.mkt-tk-side-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.side === side);
+  // ---- Formatting ---------------------------------------------------------
+  const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+  const fmtPrice = (v) => (v >= 1 ? usd.format(v) : '$' + v.toFixed(4));
+  const fmtUsd = (v) => (v > 0 && v < 0.005 ? '<$0.01' : usd.format(v));
+
+  function fmtCompact(v) {
+    const units = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+    for (const [div, suffix] of units) {
+      if (v >= div) return '$' + (v / div).toFixed(2) + suffix;
+    }
+    return '$' + Math.round(v).toLocaleString('en-US');
+  }
+
+  function fmtAmount(v) {
+    const max = v >= 1000 ? 2 : v >= 1 ? 4 : 6;
+    return v.toLocaleString('en-US', { maximumFractionDigits: max });
+  }
+
+  function fmtDelta(v) {
+    const abs = Math.abs(v);
+    const digits = abs >= 1 ? 2 : abs >= 0.01 ? 3 : 5;
+    return (v < 0 ? '-' : v > 0 ? '+' : '') + '$' + abs.toFixed(digits);
+  }
+
+  function pct(p, digits) {
+    if (p === null || p === undefined || !isFinite(p)) return null;
+    const r = Number(p.toFixed(digits === undefined ? 1 : digits));
+    return { text: (r > 0 ? '+' : '') + r.toString() + '%', cls: r > 0 ? 'pos' : r < 0 ? 'neg' : 'flat' };
+  }
+
+  function setTone(el, base, cls) {
+    el.className = base + (cls ? ' ' + cls : '');
+  }
+
+  // ---- Render -------------------------------------------------------------
+  function open24h(p) {
+    return p.change24h === null || p.change24h === undefined ? p.price : p.price / (1 + p.change24h / 100);
+  }
+
+  function render() {
+    const p = state.prices[SYMBOL];
+
+    els.price.textContent = p ? fmtPrice(p.price) : '—';
+    const info = p ? pct(p.change24h) : null;
+    els.chg.hidden = !info;
+    if (info) {
+      els.chgAbs.textContent = fmtDelta(p.price - open24h(p));
+      setTone(els.chg, 'tk-chg', info.cls);
+      els.chgPct.textContent = info.text;
+      setTone(els.chgPct, 'tk-pill', info.cls);
+    }
+    els.stat.hidden = !(p && p.mc);
+    if (p && p.mc) els.mc.textContent = fmtCompact(p.mc);
+
+    // Portfolio card + bottom bar
+    const amount = state.address && state.holdings ? state.holdings[SYMBOL] || 0 : 0;
+    const held = amount > 0 && !!p;
+    els.pos.hidden = !held;
+    els.send.hidden = els.sell.hidden = !held;
+    els.bar.classList.toggle('only-buy', !held);
+    if (held) {
+      els.posVal.textContent = fmtUsd(amount * p.price);
+      els.posAmt.textContent = `${fmtAmount(amount)} ${SYMBOL}`;
+      const delta = amount * (p.price - open24h(p)); // 24h move of the position
+      const pi = pct(p.change24h);
+      els.posDelta.textContent = fmtDelta(delta);
+      els.posPct.textContent = pi ? pi.text : '';
+      setTone(els.posPnl, 'tk-pos-pnl', pi ? pi.cls : 'flat');
+    }
+    drawChart();
+  }
+
+  // ---- Chart --------------------------------------------------------------
+  const NS = 'http://www.w3.org/2000/svg';
+  const W = 360;
+  const H = 230;
+  const PAD_T = 16;
+  const PAD_B = 16;
+
+  function svgEl(tag, attrs) {
+    const n = document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach((k) => n.setAttribute(k, attrs[k]));
+    return n;
+  }
+
+  function drawChart() {
+    const vals = state.points.map((pt) => pt[1]);
+    const live = state.prices[SYMBOL];
+    if (live && vals.length) vals.push(live.price);
+    els.plot.textContent = '';
+    els.noHist.hidden = vals.length >= 2;
+    els.axis.hidden = vals.length < 2;
+    if (vals.length < 2) return;
+
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const span = max - min || Math.abs(max) * 0.001 || 1;
+    const x = (i) => (i / (vals.length - 1)) * W;
+    const y = (v) => PAD_T + (H - PAD_T - PAD_B) * (1 - (v - min) / span);
+    const color = vals[vals.length - 1] >= vals[0] ? UP : DOWN;
+
+    [0, 0.5, 1].forEach((f) => {
+      const gy = PAD_T + (H - PAD_T - PAD_B) * f;
+      els.plot.appendChild(svgEl('line', { class: 'tk-grid', x1: 0, x2: W, y1: gy, y2: gy }));
     });
-    unitLabel.textContent = side === 'buy' ? 'USDC' : SYMBOL;
-    unitFieldLabel.textContent = side === 'buy' ? 'USDC' : SYMBOL;
-    amountInput.value = side === 'buy' ? DEFAULT_BUY_USD : '';
-    noRouteEl.hidden = true;
-    fetchQuote();
+
+    const line = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const defs = svgEl('defs', {});
+    const grad = svgEl('linearGradient', { id: 'tk-grad', x1: 0, y1: 0, x2: 0, y2: 1 });
+    grad.appendChild(svgEl('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': 0.22 }));
+    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }));
+    defs.appendChild(grad);
+    els.plot.appendChild(defs);
+    els.plot.appendChild(svgEl('path', { d: `${line} L${W},${H} L0,${H} Z`, fill: 'url(#tk-grad)' }));
+    els.plot.appendChild(svgEl('path', { d: line, class: 'tk-line', stroke: color }));
+
+    const labels = els.axis.children;
+    labels[0].textContent = fmtPrice(max);
+    labels[1].textContent = fmtPrice((max + min) / 2);
+    labels[2].textContent = fmtPrice(min);
   }
 
-  document.querySelectorAll('.mkt-tk-side-btn').forEach((btn) => {
-    btn.addEventListener('click', () => setSide(btn.dataset.side));
-  });
-
-  amountInput.addEventListener('input', () => {
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Get quote';
-    scheduleQuote();
-  });
-
-  function scheduleQuote() {
-    clearTimeout(quoteTimer);
-    quoteTimer = setTimeout(fetchQuote, 400);
-  }
-
-  // ---- Quote ---------------------------------------------------------
-  async function fetchQuote() {
-    const amount = parseFloat(amountInput.value);
-    if (!amount || amount <= 0) {
-      quoteBox.hidden = true;
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Get quote';
-      return;
-    }
-    if (!wallet) return;
-    noteEl.textContent = '';
-    noRouteEl.hidden = true;
-
-    const inputMint = side === 'buy' ? USDC_MINT : MINT;
-    const outputMint = side === 'buy' ? MINT : USDC_MINT;
-
-    try {
-      const resp = await fetch('/api/swap/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputMint, outputMint, uiAmount: amount, taker: wallet }),
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data.transaction) {
-        const deepLink = (data.detail && data.detail.deepLink) || data.deepLink;
-        if (deepLink) {
-          jupFallback.href = deepLink;
-          noRouteEl.hidden = false;
-        } else {
-          noteEl.textContent = (data.detail && data.detail.message) || 'No route found.';
-        }
-        quoteBox.hidden = true;
-        confirmBtn.disabled = true;
-        confirmBtn.hidden = true;
-        return;
-      }
-
-      lastQuote = data;
-      quoteFetchedAt = Date.now();
-
-      const outAmount = data.outAmount || data.outputAmount;
-      const outDecimals = data.outputDecimals || 6;
-      const outUi = outAmount ? Number(outAmount) / Math.pow(10, outDecimals) : null;
-
-      document.getElementById('quote-output').textContent =
-        outUi !== null ? `${outUi.toFixed(4)} ${side === 'buy' ? SYMBOL : 'USDC'}` : '—';
-      document.getElementById('quote-impact').textContent =
-        data.priceImpactPct ? `${(Number(data.priceImpactPct) * 100).toFixed(2)}%` : '—';
-
-      const usdVal = data.swapUsdValue ? Number(data.swapUsdValue) : null;
-      document.getElementById('quote-premium-after').textContent =
-        usdVal && MARK_PRICE ? vsMarkLabel(usdVal, outUi) : '—';
-
-      quoteBox.hidden = false;
-      confirmBtn.hidden = false;
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = `${side === 'buy' ? 'Buy' : 'Sell'} ${SYMBOL}`;
-    } catch (err) {
-      console.error('quote failed', err);
-      noteEl.textContent = 'Could not fetch a quote.';
-      confirmBtn.disabled = true;
-    }
-  }
-
-  function vsMarkLabel(usdVal, outUi) {
-    if (!outUi || !MARK_PRICE) return '—';
-    const impliedPrice = side === 'buy' ? usdVal / outUi : usdVal / parseFloat(amountInput.value || '1');
-    const diff = (impliedPrice / MARK_PRICE - 1) * 100;
-    const sign = diff > 0 ? '+' : '';
-    return `paying ${sign}${diff.toFixed(1)}% ${diff > 0 ? 'rich' : 'cheap'}`;
-  }
-
-  setInterval(() => {
-    if (lastQuote && Date.now() - quoteFetchedAt > QUOTE_FRESH_MS) {
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Refreshing…';
-    }
-  }, 1000);
-
-  setInterval(() => {
-    if (document.visibilityState === 'visible' && wallet) fetchQuote();
-  }, QUOTE_REFRESH_MS);
-
-  // ---- Wallet ---------------------------------------------------------
-  // Connection state lives in wallet.js (persisted across pages); we just react to it.
-  function onWalletConnected(pubkey) {
-    if (wallet === pubkey) return;
-    wallet = pubkey;
-    walletAddrEl.textContent = `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
-    walletAddrEl.hidden = false;
-    connectBtn.hidden = true;
-    fetchQuote();
-  }
-
-  function onWalletDisconnected() {
-    wallet = null;
-    lastQuote = null;
-    walletAddrEl.hidden = true;
-    connectBtn.hidden = false;
-    quoteBox.hidden = true;
-    confirmBtn.hidden = true;
-    confirmBtn.disabled = true;
-  }
-
-  window.addEventListener('marktape:wallet', (e) => {
-    if (e.detail.address) onWalletConnected(e.detail.address);
-    else onWalletDisconnected();
-  });
-
-  connectBtn.addEventListener('click', () => {
-    if (window.MarktapeWallet) window.MarktapeWallet.connectWithPicker();
-  });
-
-  if (window.MarktapeWallet && window.MarktapeWallet.getAddress()) {
-    onWalletConnected(window.MarktapeWallet.getAddress());
-  }
-
-  confirmBtn.addEventListener('click', async () => {
-    if (!lastQuote || !lastQuote.transaction || !wallet) return;
-    if (Date.now() - quoteFetchedAt > QUOTE_FRESH_MS) {
-      await fetchQuote();
-      return;
-    }
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Confirm in wallet…';
-    try {
-      const signed = await window.MarktapeWallet.signTransactionBase64(lastQuote.transaction);
-      let signature = signed.signature;
-      if (!signature && signed.signedTransactionBase64) {
-        const execResp = await fetch('/api/swap/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            signedTransaction: signed.signedTransactionBase64,
-            requestId: lastQuote.requestId,
-          }),
-        });
-        const execData = await execResp.json();
-        signature = execData.signature;
-      }
-      if (signature) {
-        resultEl.hidden = false;
-        resultEl.innerHTML = `Done — <a href="https://solscan.io/tx/${signature}" target="_blank" rel="noopener">View on Solscan ↗</a>`;
-        fetchQuote();
-      } else {
-        noteEl.textContent = 'Transaction did not confirm.';
-      }
-    } catch (err) {
-      console.error('swap failed', err);
-      noteEl.textContent = 'Swap cancelled or failed.';
-    } finally {
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = `${side === 'buy' ? 'Buy' : 'Sell'} ${SYMBOL}`;
-    }
-  });
-
-  // ---- Copy chips -------------------------------------------------------
-  document.getElementById('mint-copy').addEventListener('click', (e) => {
-    navigator.clipboard.writeText(e.currentTarget.dataset.mint);
-    const el = e.currentTarget;
-    const prev = el.textContent;
-    el.textContent = 'Copied';
-    setTimeout(() => { el.textContent = prev; }, 1200);
-  });
-
-  const mintFull = document.getElementById('mkt-tk-mint-full');
-  if (mintFull) {
-    mintFull.addEventListener('click', () => {
-      navigator.clipboard.writeText(mintFull.textContent);
-      const prev = mintFull.textContent;
-      mintFull.textContent = 'Copied';
-      setTimeout(() => { mintFull.textContent = prev; }, 1200);
-    });
-  }
-
-  // ---- Chart --------------------------------------------------------
-  const plot = document.getElementById('mkt-tk-plot');
-  const noHistoryEl = document.getElementById('mkt-tk-no-history');
-  const RANGE_LIMIT = { '1H': 12, '6H': 36, '1D': 48, '1W': 48, '1M': 48 };
-
-  function renderChart(points) {
-    plot.innerHTML = '';
-    if (!points || points.length < 2) {
-      noHistoryEl.hidden = false;
-      return;
-    }
-    noHistoryEl.hidden = true;
-    const w = 600, h = 220, pad = 8;
-    const min = Math.min(...points);
-    const max = Math.max(...points);
-    const range = max - min || 1;
-    const stepX = (w - pad * 2) / (points.length - 1);
-    const coords = points.map((p, i) => {
-      const x = pad + i * stepX;
-      const y = pad + (h - pad * 2) * (1 - (p - min) / range);
-      return [x, y];
-    });
-    const lineD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(' ');
-    const up = points[points.length - 1] >= points[0];
-    const stroke = '#1475E1';
-    const fillColor = up ? '#22C55E' : '#EF4444';
-
-    const fillD = `${lineD} L${coords[coords.length - 1][0].toFixed(1)},${h - pad} L${coords[0][0].toFixed(1)},${h - pad} Z`;
-
-    const ns = 'http://www.w3.org/2000/svg';
-    const fillPath = document.createElementNS(ns, 'path');
-    fillPath.setAttribute('d', fillD);
-    fillPath.setAttribute('fill', fillColor);
-    fillPath.setAttribute('opacity', '0.08');
-    plot.appendChild(fillPath);
-
-    const linePath = document.createElementNS(ns, 'path');
-    linePath.setAttribute('d', lineD);
-    linePath.setAttribute('fill', 'none');
-    linePath.setAttribute('stroke', stroke);
-    linePath.setAttribute('stroke-width', '1.5');
-    plot.appendChild(linePath);
-  }
-
+  let chartReq = 0;
   async function loadChart() {
+    const req = ++chartReq;
     try {
-      const resp = await fetch(`/api/sparkline/${SYMBOL}?limit=${RANGE_LIMIT[range] || 48}`);
-      const data = await resp.json();
-      renderChart((data.points || []).filter((p) => p !== null && p !== undefined));
+      const data = await getJSON(`/api/chart/${encodeURIComponent(SYMBOL)}?range=${state.range}`);
+      if (req !== chartReq) return;
+      state.points = data.points || [];
     } catch (err) {
-      console.error('sparkline failed', err);
-      renderChart([]);
+      if (req !== chartReq) return;
+      // keep whatever we had for this range
+    }
+    drawChart();
+  }
+
+  els.ranges.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-range]');
+    if (!btn || btn.dataset.range === state.range) return;
+    state.range = btn.dataset.range;
+    els.ranges.querySelectorAll('.tk-range').forEach((b) => b.classList.toggle('active', b === btn));
+    state.points = [];
+    drawChart();
+    loadChart();
+  });
+
+  // ---- Data ---------------------------------------------------------------
+  async function getJSON(url) {
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(url + ' ' + resp.status);
+    return resp.json();
+  }
+
+  let pricesBusy = false;
+  async function tickPrices() {
+    if (document.hidden || pricesBusy) return;
+    pricesBusy = true;
+    try {
+      const data = await getJSON('/api/prices');
+      state.prices = data.prices || {};
+      render();
+    } catch (err) { /* keep last prices */ } finally {
+      pricesBusy = false;
     }
   }
 
-  document.querySelectorAll('.mkt-tk-range-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.mkt-tk-range-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      range = btn.dataset.range;
-      loadChart();
-    });
+  let balancesFor = null;
+  async function tickBalances() {
+    const addr = state.address;
+    if (!addr || document.hidden || balancesFor === addr) return;
+    balancesFor = addr;
+    try {
+      const data = await getJSON('/api/balances/' + encodeURIComponent(addr));
+      if (addr === state.address && data && data.holdings) {
+        state.holdings = data.holdings;
+        render();
+      }
+    } catch (err) { /* keep last holdings */ } finally {
+      if (balancesFor === addr) balancesFor = null;
+    }
+  }
+
+  async function loadAssets() {
+    try {
+      const data = await getJSON('/api/assets');
+      state.assets = data.assets || {};
+    } catch (err) {
+      setTimeout(loadAssets, 3000);
+    }
+  }
+
+  const getCtx = () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets });
+  const refreshBalances = () => {
+    tickBalances();
+    setTimeout(tickBalances, 2500); // pick up the settled balance
+  };
+
+  // ---- Actions ------------------------------------------------------------
+  function connect() {
+    if (window.MarktapeWallet) window.MarktapeWallet.connectWithPicker();
+  }
+
+  els.send.addEventListener('click', () => {
+    if (!state.address || !window.MarktapeSend) return;
+    window.MarktapeSend.open({ symbol: SYMBOL, getCtx, onSent: refreshBalances });
   });
 
+  function openSwap(side) {
+    if (!state.address) { connect(); return; }
+    if (window.MarktapeSwap) window.MarktapeSwap.open({ side, symbol: SYMBOL, getCtx, onDone: refreshBalances });
+  }
+  els.buy.addEventListener('click', () => openSwap('buy'));
+  els.sell.addEventListener('click', () => openSwap('sell'));
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) { /* fall back below */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Share = copy the Jupiter link; the icon turns into "Copied" for 2s.
+  let shareTimer = null;
+  els.share.addEventListener('click', async () => {
+    if (els.share.classList.contains('done')) return;
+    if (!(await copyText(els.share.dataset.link))) return;
+    els.share.classList.add('done');
+    clearTimeout(shareTimer);
+    shareTimer = setTimeout(() => els.share.classList.remove('done'), 2000);
+  });
+
+  let mintTimer = null;
+  const mintShort = els.mintText.textContent;
+  els.mint.addEventListener('click', async () => {
+    if (!(await copyText(els.mint.dataset.mint))) return;
+    els.mintText.textContent = 'Copied';
+    clearTimeout(mintTimer);
+    mintTimer = setTimeout(() => { els.mintText.textContent = mintShort; }, 1200);
+  });
+
+  els.back.addEventListener('click', () => {
+    let same = false;
+    try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (_) {}
+    if (same && history.length > 1) history.back();
+    else location.href = '/';
+  });
+
+  // ---- About: clamp + Read More -------------------------------------------
+  function measureAbout() {
+    if (els.about.classList.contains('expanded')) return;
+    els.more.hidden = !(els.aboutText.scrollHeight > els.aboutText.clientHeight + 1);
+  }
+  els.more.addEventListener('click', () => {
+    const open = els.about.classList.toggle('expanded');
+    els.more.querySelector('span').textContent = open ? 'Read Less' : 'Read More';
+  });
+  window.addEventListener('resize', measureAbout);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureAbout);
+
+  // ---- Wallet -------------------------------------------------------------
+  function setAddress(next) {
+    if (next === state.address) return;
+    state.address = next;
+    state.holdings = null;
+    render();
+    tickBalances();
+  }
+  window.addEventListener('marktape:wallet', (e) => setAddress(e.detail.address));
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    tickPrices();
+    tickBalances();
+  });
+
+  // ---- Boot ---------------------------------------------------------------
+  state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
+  render();
+  measureAbout();
+  loadAssets();
   loadChart();
-  setSide('buy');
+  tickPrices();
+  tickBalances();
+  setInterval(tickPrices, PRICE_MS);
+  setInterval(tickBalances, BALANCE_MS);
+  setInterval(loadChart, CHART_MS);
 })();
