@@ -36,8 +36,15 @@
     tabStocks: document.querySelector('[data-tab="stocks"]'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
+    holdOpen: $('hm-hold-open'),
     newsList: $('hm-news-list'),
     newsEmpty: $('hm-news-empty'),
+    hldRoot: $('hld-root'),
+    hldBackdrop: $('hld-backdrop'),
+    hldSheet: $('hld-sheet'),
+    hldClose: $('hld-close'),
+    hldRows: $('hld-rows'),
+    hldEmpty: $('hld-empty'),
   };
 
   const state = {
@@ -391,7 +398,57 @@
     const loading = !!state.address && state.holdings === null;
     els.holdEmpty.hidden = rows.length > 0 || loading;
     els.holdEmpty.textContent = state.address ? 'No Holdings yet' : 'Connect wallet';
+    if (hldOpen) renderHldModal();
   }
+
+  // ---- Holdings modal (View All) -------------------------------------------
+  let hldOpen = false;
+
+  function renderHldModal() {
+    const rows = state.address && state.holdings ? computePortfolio().rows : [];
+    syncList(els.hldRows, rows, (r) => r.symbol, buildHoldRow, updateHoldRow);
+    els.hldEmpty.hidden = rows.length > 0;
+  }
+
+  function openHldModal() {
+    if (hldOpen || !state.address) return;
+    hldOpen = true;
+    renderHldModal();
+    els.hldRows.scrollTop = 0;
+    els.hldRoot.hidden = false;
+    document.documentElement.classList.add('hld-lock');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      els.hldBackdrop.classList.add('open');
+      els.hldSheet.classList.add('open');
+    }));
+  }
+
+  function closeHldModal() {
+    if (!hldOpen) return;
+    hldOpen = false;
+    els.hldBackdrop.classList.remove('open');
+    els.hldSheet.classList.remove('open');
+    document.documentElement.classList.remove('hld-lock');
+    setTimeout(() => { if (!hldOpen) els.hldRoot.hidden = true; }, 260);
+  }
+
+  if (els.holdOpen) els.holdOpen.addEventListener('click', openHldModal);
+  els.hldBackdrop.addEventListener('click', closeHldModal);
+  els.hldClose.addEventListener('click', closeHldModal);
+  els.hldRows.addEventListener('click', (e) => {
+    const row = e.target.closest('a.hm-row');
+    if (!row) return;
+    e.preventDefault();
+    hldOpen = false;
+    els.hldRoot.hidden = true;
+    els.hldBackdrop.classList.remove('open');
+    els.hldSheet.classList.remove('open');
+    document.documentElement.classList.remove('hld-lock');
+    location.href = row.href;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && hldOpen) closeHldModal();
+  });
 
   // ---- News ---------------------------------------------------------------
   function buildNews(item) {
