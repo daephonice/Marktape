@@ -266,13 +266,13 @@ body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
   left: 50%;
   bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  width: min(calc(100% - 32px), 448px);
-  height: 64px;
-  padding: 6px;
+  width: min(calc(100% - 48px), 340px);
+  height: 60px;
+  padding: 5px;
   display: flex;
   gap: 4px;
   background: var(--hm-ctrl);
-  border-radius: 32px;
+  border-radius: 30px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   z-index: 30;
 }
@@ -283,7 +283,7 @@ body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
   align-items: center;
   justify-content: center;
   gap: 3px;
-  border-radius: 26px;
+  border-radius: 25px;
   color: var(--hm-dim);
   font-size: 12px;
   cursor: default;
@@ -294,6 +294,8 @@ body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
 .hm-tab.active .hm-tab-ic-fill { display: block; }
 .hm-tab.active { background: var(--hm-ctrl-on); color: var(--hm-text); }
 a.hm-tab { cursor: pointer; }
+body.hm a.hm-tab { color: var(--hm-dim); }
+body.hm a.hm-tab.active { color: var(--hm-text); }
 
 /* ==========================================================================
    Send flow (sheet -> address -> amount panel -> toast). Lives on body.hm.
