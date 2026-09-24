@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block body_class %}hm{% endblock %}
+
+{% block header %}
+<header class="hm-header">
+  <div class="hm-col hm-header-inner">
+    <a href="/" class="mkt-brand">
+      <span class="mkt-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="30" height="30" fill="none">
+          <rect x="1" y="1" width="30" height="30" rx="8" stroke="#1475E1" stroke-width="1.4"/>
+          <path d="M8 21L13 12L17 18L24 9" stroke="#1475E1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="mkt-wordmark">Marktape</span>
+    </a>
+    <button class="mkt-connect-btn" id="mkt-connect-btn" type="button">Connect wallet</button>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="currentColor"/></symbol>
+  <symbol id="i-verified" viewBox="0 0 24 24"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="hm-col">
+  <section class="hm-balance">
+    <div class="hm-total" id="hm-total">$0.00</div>
+    <div class="hm-change flat" id="hm-change">
+      <span id="hm-change-text">$0.00 (0%)</span>
+      <span class="hm-change-range">1D</span>
+      <svg class="hm-icon" width="16" height="16"><use href="#i-chevron"/></svg>
+    </div>
+  </section>
+
+  <div class="hm-actions locked" id="hm-actions">
+    <div class="hm-action">
+      <button class="hm-action-btn" type="button" aria-disabled="true" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+      </button>
+      <span class="hm-action-label">Send</span>
+    </div>
+    <div class="hm-action">
+      <button class="hm-action-btn" type="button" aria-disabled="true" aria-label="Swap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+      </button>
+      <span class="hm-action-label">Swap</span>
+    </div>
+    <div class="hm-action">
+      <button class="hm-action-btn" type="button" aria-disabled="true" aria-label="Lend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg>
+      </button>
+      <span class="hm-action-label">Lend</span>
+    </div>
+  </div>
+  <p class="hm-lock-notice" id="hm-lock-notice">Connect Wallet to Access</p>
+
+  <section class="hm-card">
+    <div class="hm-card-head">
+      <h2>Watchlist</h2>
+      <svg class="hm-icon" width="20" height="20"><use href="#i-chevron"/></svg>
+    </div>
+    <div class="hm-rows" id="hm-watch-rows"></div>
+    <p class="hm-empty" id="hm-watch-empty">Connect wallet</p>
+  </section>
+
+  <section class="hm-card">
+    <div class="hm-card-head">
+      <h2>Portfolio</h2>
+      <svg class="hm-icon" width="20" height="20"><use href="#i-chevron"/></svg>
+    </div>
+    <div class="hm-rows" id="hm-hold-rows"></div>
+    <p class="hm-empty" id="hm-hold-empty">Connect wallet</p>
+  </section>
+
+  <section class="hm-news">
+    <h2 class="hm-news-title">News</h2>
+    <div id="hm-news-list"></div>
+    <p class="hm-news-empty" id="hm-news-empty" hidden>No news available yet</p>
+  </section>
+</div>
+{% endblock %}
+
+{% block footer %}
+<footer class="hm-col hm-footer">
+  <p>Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. Marktape does not custody funds.</p>
+</footer>
+{% set nav_active = 'home' %}
+{% include "_bottom_nav.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/home.js?v={{ static_v('js/home.js') }}"></script>
+{% endblock %}
