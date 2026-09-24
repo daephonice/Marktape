@@ -77,6 +77,21 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
   display: inline-block;
 }
 
+/* Wallet pill dropdown (Copy Address / Disconnect wallet) */
+.mkt-wallet-menu {
+  position: fixed; z-index: 200; min-width: 148px; box-sizing: border-box;
+  background: #1c1d21; border: 1px solid #2e3036; border-radius: 12px;
+  padding: 4px; display: flex; flex-direction: column; gap: 2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.mkt-wallet-menu-item {
+  width: 100%; padding: 11px 12px; border: 0; border-radius: 9px; background: none;
+  color: #fafafa; font-family: 'Geist', -apple-system, sans-serif; font-size: 14px; font-weight: 500;
+  text-align: left; white-space: nowrap; cursor: pointer;
+}
+.mkt-wallet-menu-item:hover, .mkt-wallet-menu-item:active { background: #23252a; }
+.mkt-wallet-menu-item.danger { color: #ef4444; }
+
 /* ==========================================================================
    Homepage (app-style) — scoped to body.hm. Mobile-first single column.
    Reuses .mkt-brand / .mkt-wordmark / .mkt-connect-btn from above.
@@ -442,7 +457,7 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .hld-backdrop.open { opacity: 1; }
 .hld-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto;
-  height: 72%; max-height: 640px; display: flex; flex-direction: column;
+  display: flex; flex-direction: column;
   background: #1c1d21; border-radius: 28px 28px 0 0;
   padding: 10px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
@@ -453,9 +468,16 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .hld-head { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: 8px; }
 .hld-title { margin: 0; font-size: 22px; font-weight: 600; }
 .hld-close { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--hm-ctrl, #23252a); color: inherit; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-.hld-rows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 10px; padding-bottom: 4px; }
-.hld-rows .hm-row { padding: 10px 12px; background: var(--hm-card, #191b1f); border: 1px solid var(--hm-line); border-radius: 16px; }
-.hld-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--hm-muted, #9d9ea2); }
+/* 4 rows per page: 4 x 64px + 3 x 10px gap. Scrolls when more. */
+.hld-rows { flex: none; height: 286px; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 10px; }
+.hld-rows[hidden] { display: none; }
+.hld-rows .hm-row { flex-shrink: 0; height: 64px; box-sizing: border-box; padding: 0 12px; background: var(--hm-card, #191b1f); border: 1px solid var(--hm-line); border-radius: 16px; }
+.hld-disc {
+  display: block; width: 100%; height: 56px; margin-top: 14px; flex-shrink: 0; border: 0; border-radius: 999px;
+  background: #e5484d; color: #fff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer;
+}
+.hld-disc:active { opacity: 0.85; }
+.hld-empty { flex: none; height: 286px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--hm-muted, #9d9ea2); }
 .hld-empty[hidden] { display: none; }
 .hld-empty-ic { color: var(--hm-dim); }
 .hld-empty p { margin: 0; font-size: 16px; }
