@@ -2,7 +2,6 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select
 
 import prestocks
 import multiplier as multiplier_mod
@@ -12,8 +11,7 @@ import balances
 import chart
 import prices
 import send
-from database import SessionLocal
-from models import NewsItem
+import news
 
 log = logging.getLogger("routes_api")
 
@@ -64,27 +62,10 @@ async def api_balances(address: str):
 
 
 @router.get("/news")
-def api_news(limit: int = 20):
-    """Latest homepage news, newest first."""
-    limit = max(1, min(limit, 50))
-    db = SessionLocal()
-    try:
-        rows = db.execute(
-            select(NewsItem).order_by(NewsItem.published_at.desc()).limit(limit)
-        ).scalars().all()
-        return {
-            "items": [
-                {
-                    "id": r.id,
-                    "symbol": r.symbol.upper(),
-                    "body": r.body,
-                    "publishedAt": r.published_at.isoformat(),
-                }
-                for r in rows
-            ]
-        }
-    finally:
-        db.close()
+def api_news():
+    """One latest news item per PreStocks token, shared by every user (served
+    from memory; refreshed hourly by news.py)."""
+    return {"items": news.get_news()}
 
 
 @router.get("/chart/{symbol}")

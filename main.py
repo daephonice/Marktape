@@ -17,6 +17,7 @@ import routes_pages
 import routes_api
 import board
 import prices
+import news
 import telegram_bot
 
 
@@ -44,4 +45,5 @@ app.include_router(routes_api.router)
 async def _start_background_tasks():
     board.start_board_refresh_task()
     prices.start_price_task()
+    news.start_news_task()
     telegram_bot.start_telegram_bot_task()
