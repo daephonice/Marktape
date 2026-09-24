@@ -97,20 +97,23 @@ class SwapOrderRequest(BaseModel):
     taker: str
 
 
+async def _leg_info(mint: str) -> dict:
+    """{decimals, multiplier, transferFeeBps} for any accepted mint (SOL,
+    USDC/USDT classic tokens have no scaled-UI/transfer-fee extensions)."""
+    if mint in (prestocks.USDC_MINT, balances.STABLE_MINTS["USDT"], prices.TOKEN_ASSETS["SOL"]["mint"]):
+        decimals = 9 if mint == prices.TOKEN_ASSETS["SOL"]["mint"] else 6
+        return {"decimals": decimals, "multiplier": 1.0, "transferFeeBps": 0}
+    return await multiplier_mod.get_mint_info(mint)
+
+
 @router.post("/swap/order")
 async def swap_order(body: SwapOrderRequest):
     # Hard rule: never build an order for a blocklisted competitor mint.
     if prestocks.is_blocked_mint(body.inputMint) or prestocks.is_blocked_mint(body.outputMint):
         raise HTTPException(status_code=400, detail="Mint not supported")
 
-    # Figure out decimals/multiplier for whichever side is the PreStock leg.
-    if body.inputMint == prestocks.USDC_MINT:
-        decimals, mult = prestocks.USDC_DECIMALS, 1.0
-    else:
-        m = await multiplier_mod.get_mint_multiplier(body.inputMint)
-        decimals, mult = m["decimals"], m["multiplier"]
-
-    amount_raw = multiplier_mod.to_raw_amount(body.uiAmount, decimals, mult)
+    in_info, out_info = await _leg_info(body.inputMint), await _leg_info(body.outputMint)
+    amount_raw = multiplier_mod.to_raw_amount(body.uiAmount, in_info["decimals"], in_info["multiplier"])
 
     try:
         order = await jupiter.get_ultra_order(body.inputMint, body.outputMint, amount_raw, body.taker)
@@ -126,7 +129,27 @@ async def swap_order(body: SwapOrderRequest):
 
     if "transaction" not in order:
         order["deepLink"] = jupiter.jup_deep_link(body.inputMint, body.outputMint)
+        return order
 
+    # UI-friendly fields for the panel + Price Info modal. Raw Ultra fields
+    # are left in place too, in case the frontend ever wants them.
+    out_raw = order.get("outAmount")
+    min_raw = order.get("otherAmountThreshold")
+    in_ui = body.uiAmount
+    out_ui = multiplier_mod.to_ui_amount(out_raw, out_info["decimals"], out_info["multiplier"]) if out_raw else None
+    min_ui = multiplier_mod.to_ui_amount(min_raw, out_info["decimals"], out_info["multiplier"]) if min_raw else None
+
+    order["uiOutAmount"] = out_ui
+    order["uiMinReceived"] = min_ui
+    order["rate"] = (out_ui / in_ui) if out_ui and in_ui else None
+    order["priceImpactPct"] = order.get("priceImpactPct")
+    order["gasless"] = bool(order.get("gasless") or order.get("totalTime") == 0 or not order.get("feeBps"))
+    order["routes"] = [
+        step.get("swapInfo", {}).get("label") or step.get("label")
+        for step in (order.get("routePlan") or [])
+        if step.get("swapInfo", {}).get("label") or step.get("label")
+    ]
+    order["transferFeeBps"] = max(in_info["transferFeeBps"], out_info["transferFeeBps"])
     return order
 
 
