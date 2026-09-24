@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
-import prestocks
+import prices
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -18,11 +18,6 @@ def _static_v(rel_path: str) -> str:
 
 
 templates.env.globals["static_v"] = _static_v
-templates.env.globals["web_public_url"] = os.getenv("WEB_PUBLIC_URL", "")
-templates.env.globals["telegram_public_url"] = os.getenv("TELEGRAM_PUBLIC_URL", "")
-templates.env.globals["telegram_bot_username"] = os.getenv("TELEGRAM_BOT_USERNAME", "")
-templates.env.globals["format_premium"] = prestocks.format_premium
-templates.env.globals["premium_status"] = prestocks.premium_status
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -32,23 +27,10 @@ async def home_page(request: Request):
 
 @router.get("/t/{symbol}", response_class=HTMLResponse)
 async def token_page(request: Request, symbol: str):
-    snap = prestocks.get_cached_snapshot()
-    symbol_u = symbol.upper()
-    row = next((t for t in snap.get("tokens", []) if t["symbol"].upper() == symbol_u), None)
-    if not row:
+    asset = prices.get_asset(symbol)
+    if asset is None:
+        await prices.wait_ready()  # cold start: first PreStocks refresh may not have landed
+        asset = prices.get_asset(symbol)
+    if asset is None:
         raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
-    return templates.TemplateResponse(
-        request, "token.html", {"token": row}
-    )
-
-
-@router.get("/share/{symbol}", response_class=HTMLResponse)
-async def share_page(request: Request, symbol: str):
-    snap = prestocks.get_cached_snapshot()
-    symbol_u = symbol.upper()
-    row = next((t for t in snap.get("tokens", []) if t["symbol"].upper() == symbol_u), None)
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
-    return templates.TemplateResponse(
-        request, "share.html", {"token": row}
-    )
+    return templates.TemplateResponse(request, "token.html", {"token": asset})

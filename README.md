@@ -4,8 +4,8 @@ Mark vs tape for PreStocks.
 
 PreStocks tokens trade 24/7 on Solana. Each name has an onchain token price
 and an issuer mark price. Those two numbers diverge. Marktape is a desk for
-that gap: a live board, a token page, an in-page Jupiter Ultra swap of the
-PreStocks mint only, and optional Telegram alerts.
+that gap: live stock prices, a token page per asset, an in-page Jupiter Ultra
+swap of the PreStocks mint only, and optional Telegram alerts.
 
 ## Bounty
 
@@ -41,10 +41,7 @@ uvicorn main:app --reload
 | `SOLANA_RPC_URL` | yes | Helius / Triton / QuickNode / Ankr — public RPC will rate-limit. Free tier at helius.dev works. |
 | `WEB_PUBLIC_URL` | yes | Railway → your web service → Settings → Generate Domain, then paste it here |
 | `JUPITER_API_KEY` | yes (for swap) | https://developers.jup.ag/portal |
-| `CRON_SECRET` | no | Any random string you choose, only needed if you wire an external cron to hit a refresh endpoint |
 | `TELEGRAM_BOT_TOKEN` | yes (for bot) | Message @BotFather on Telegram → `/newbot` |
-| `TELEGRAM_BOT_USERNAME` | yes (for bot) | The username you gave BotFather, e.g. `MarktapeBot` |
-| `TELEGRAM_PUBLIC_URL` | no (has default) | `https://t.me/<your bot username>` |
 
 Seal `TELEGRAM_BOT_TOKEN`, `SOLANA_RPC_URL`, `DATABASE_URL`, `JUPITER_API_KEY`
 in Railway (Variables → Seal).

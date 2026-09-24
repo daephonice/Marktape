@@ -9,10 +9,11 @@ import multiplier as multiplier_mod
 import jupiter
 import board as board_mod
 import balances
+import chart
 import prices
 import send
 from database import SessionLocal
-from models import PriceSnapshot, NewsItem
+from models import NewsItem
 
 log = logging.getLogger("routes_api")
 
@@ -86,24 +87,16 @@ def api_news(limit: int = 20):
         db.close()
 
 
-@router.get("/sparkline/{symbol}")
-async def get_sparkline(symbol: str, limit: int = 48):
-    """Last N price_snapshots rows for one symbol, oldest first — enough
-    for a lightweight line chart on the board cards. Reads only; the rows
-    are written by board.py's refresh loop, no new writes here."""
-    symbol_u = symbol.upper()
-    db = SessionLocal()
-    try:
-        rows = db.execute(
-            select(PriceSnapshot.token_price, PriceSnapshot.fetched_at)
-            .where(PriceSnapshot.symbol == symbol_u)
-            .order_by(PriceSnapshot.fetched_at.desc())
-            .limit(limit)
-        ).all()
-    finally:
-        db.close()
-    rows = list(reversed(rows))
-    return {"symbol": symbol_u, "points": [r[0] for r in rows]}
+@router.get("/chart/{symbol}")
+async def get_chart(symbol: str, range: str = "1D"):
+    """Price history [[epoch_ms, price], ...] for the token-page chart."""
+    sym = symbol.upper()
+    rng = range.upper()
+    if prices.get_asset(sym) is None:
+        raise HTTPException(status_code=404, detail="Unknown symbol")
+    if rng not in chart.RANGES:
+        raise HTTPException(status_code=400, detail="Bad range")
+    return {"symbol": sym, "range": rng, "points": await chart.get_points(sym, rng)}
 
 
 @router.get("/token/{symbol}")

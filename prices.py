@@ -37,12 +37,39 @@ BINANCE_BASES = ("https://data-api.binance.vision", "https://api.binance.com")
 BINANCE_PAIRS = ("SOLUSDT", "USDCUSDT")
 
 TOKEN_ASSETS = {
-    "SOL": {"name": "Solana", "image": "/static/img/sol.svg"},
-    "USDT": {"name": "Tether", "image": "/static/img/usdt.svg"},
-    "USDC": {"name": "USD Coin", "image": "/static/img/usdc.svg"},
+    "SOL": {
+        "name": "Solana",
+        "image": "/static/img/sol.svg",
+        "mint": "So11111111111111111111111111111111111111112",
+        "url": "https://solana.com",
+        "description": (
+            "Solana is a high-throughput blockchain. SOL is its native token, used to pay "
+            "network fees and to stake with validators that secure the network."
+        ),
+    },
+    "USDT": {
+        "name": "Tether",
+        "image": "/static/img/usdt.svg",
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "url": "https://tether.to",
+        "description": (
+            "Tether (USDT) is a stablecoin designed to track the US dollar 1:1, "
+            "issued by Tether Limited."
+        ),
+    },
+    "USDC": {
+        "name": "USD Coin",
+        "image": "/static/img/usdc.svg",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "url": "https://www.circle.com/usdc",
+        "description": (
+            "USD Coin (USDC) is a dollar-backed stablecoin issued by Circle, "
+            "designed to be redeemable 1:1 for US dollars."
+        ),
+    },
 }
 
-_stocks: dict[str, dict] = {}       # SYMBOL -> {symbol, mint, name, image, supply, price}
+_stocks: dict[str, dict] = {}       # SYMBOL -> {symbol, mint, name, image, description, url, supply, price}
 _tokens: dict[str, dict] = {}       # SOL/USDT/USDC -> {price, open}
 _stock_open: dict[str, float] = {}  # raw symbol -> price ~24h ago
 _updated_at: datetime | None = None
@@ -76,11 +103,15 @@ async def _refresh_stocks(client: httpx.AsyncClient) -> None:
         if price <= 0:
             continue
         supply = r.get("supply")
+        url = r.get("external_url")
+        desc = r.get("description")
         _stocks[r["symbol"].upper()] = {
             "symbol": r["symbol"],
             "mint": r["contract_address"],
             "name": r.get("name") or r["symbol"],
             "image": r.get("image"),
+            "description": desc if isinstance(desc, str) and desc.strip() else None,
+            "url": url if isinstance(url, str) and url.startswith(("https://", "http://")) else None,
             "supply": float(supply) if isinstance(supply, (int, float)) else None,
             "price": price,
         }
@@ -203,7 +234,7 @@ def get_prices() -> dict | None:
 
 def get_assets() -> dict:
     """Static display metadata (name, logo, kind) for every tradable asset."""
-    assets = {sym: {**meta, "kind": "token"} for sym, meta in TOKEN_ASSETS.items()}
+    assets = {sym: {"name": m["name"], "image": m["image"], "kind": "token"} for sym, m in TOKEN_ASSETS.items()}
     for sym, s in _stocks.items():
         assets[sym] = {"name": s["name"], "image": s["image"], "kind": "stock"}
     return {"assets": assets}
@@ -212,3 +243,30 @@ def get_assets() -> dict:
 def stock_mints() -> dict[str, str]:
     """{mint: SYMBOL} for every PreStocks token currently in the universe."""
     return {s["mint"]: sym for sym, s in _stocks.items()}
+
+
+def get_asset(symbol: str) -> dict | None:
+    """Full detail for one of the 11 accepted assets (token page), or None."""
+    sym = (symbol or "").upper()
+    t = TOKEN_ASSETS.get(sym)
+    if t:
+        return {"symbol": sym, "kind": "token", **t}
+    s = _stocks.get(sym)
+    if s:
+        return {
+            "symbol": sym,
+            "kind": "stock",
+            "name": s["name"],
+            "image": s["image"],
+            "mint": s["mint"],
+            "description": s["description"],
+            "url": s["url"],
+        }
+    return None
+
+
+async def wait_ready(timeout: float = 4.0) -> None:
+    """Cold start only: wait for the first PreStocks refresh to land."""
+    end = time.monotonic() + timeout
+    while not _stocks and time.monotonic() < end:
+        await asyncio.sleep(0.1)
