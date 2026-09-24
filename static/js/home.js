@@ -410,10 +410,12 @@
     syncList(els.hldRows, rows, (r) => r.symbol, buildHoldRow, updateHoldRow);
     els.hldEmpty.hidden = rows.length > 0;
     els.hldRows.hidden = rows.length === 0;
+    els.hldDisc.textContent = state.address ? 'Disconnect wallet' : 'Connect wallet';
+    els.hldDisc.classList.toggle('connect', !state.address);
   }
 
   function openHldModal() {
-    if (hldOpen || !state.address) return;
+    if (hldOpen) return;
     hldOpen = true;
     renderHldModal();
     els.hldRows.scrollTop = 0;
@@ -438,8 +440,13 @@
   els.hldBackdrop.addEventListener('click', closeHldModal);
   els.hldClose.addEventListener('click', closeHldModal);
   els.hldDisc.addEventListener('click', async () => {
-    closeHldModal();
-    if (window.MarktapeWallet) await window.MarktapeWallet.disconnect();
+    if (!window.MarktapeWallet) return;
+    if (state.address) {
+      closeHldModal();
+      await window.MarktapeWallet.disconnect();
+    } else {
+      await window.MarktapeWallet.connectWithPicker();
+    }
   });
   els.hldRows.addEventListener('click', (e) => {
     const row = e.target.closest('a.hm-row');
@@ -520,7 +527,7 @@
 
   function renderNews() {
     const items = state.news || [];
-    syncList(els.newsList, items, (i) => String(i.id), buildNews, updateNews);
+    syncList(els.newsList, items, (i) => i.symbol, buildNews, updateNews);
     els.newsEmpty.hidden = state.news === null || items.length > 0;
     if (Array.from(els.newsList.children).some((n) => !n.dataset.measured)) requestAnimationFrame(measureNews);
   }
