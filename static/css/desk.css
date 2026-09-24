@@ -110,7 +110,7 @@ body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
 .hm [hidden] { display: none !important; }
 
 /* Header */
-.hm-header { position: sticky; top: 0; z-index: 20; background: var(--hm-bg); }
+.hm-header { position: sticky; top: 0; z-index: 20; background: var(--hm-bg); padding-top: env(safe-area-inset-top, 0px); }
 .hm-header-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; }
 .hm .mkt-wordmark { font-size: 24px; }
 .hm .mkt-connect-btn { height: 40px; padding: 0 16px; border-radius: 10px; font-size: 15px; }
@@ -184,13 +184,14 @@ body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #6d5ff5;
-  color: #fff;
+  background: #fff;
   border: 2px solid var(--hm-card);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
+.hm-badge img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .hm-row-main { flex: 1; min-width: 0; }
 .hm-sym { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .hm-sym-text { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -416,7 +417,7 @@ button.hm-tab.active { background: var(--hm-ctrl-on); }
   position: fixed;
   left: 0;
   right: 0;
-  top: 64px;
+  top: calc(64px + env(safe-area-inset-top, 0px));
   bottom: 0;
   z-index: 25;
   background: var(--hm-bg);
