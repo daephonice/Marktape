@@ -409,8 +409,6 @@ html.snd-lock, html.snd-lock body { overflow: hidden; }
 /* ==========================================================================
    Home: Stocks card + Stocks panel
    ========================================================================== */
-html.stk-lock, html.stk-lock body { overflow: hidden; }
-
 button.hm-card-link {
   width: 100%;
   background: none;
@@ -431,23 +429,12 @@ button.hm-tab { background: none; border: 0; padding: 0; font-family: inherit; c
 button.hm-tab.active { background: var(--hm-ctrl-on); }
 
 .stk-panel {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: calc(64px + env(safe-area-inset-top, 0px));
-  bottom: 0;
-  z-index: 25;
-  background: var(--hm-bg);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  display: none;
   padding-top: 16px;
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
-  transform: translateX(100%);
-  visibility: hidden;
-  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.26s;
 }
-.stk-panel.open { transform: none; visibility: visible; transition-delay: 0s; }
+.stk-panel.open { display: block; }
 
 /* ==========================================================================
    Holdings modal (View All -> Portfolio). Bottom sheet, like the Send menu.
@@ -616,29 +603,18 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
    Lives on body.hm. trade.js.
    ========================================================================== */
 html.trd-lock, html.trd-lock body { overflow: hidden; }
-html.trd-lock .hm-nav, html.stk-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
+html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 
 .trd-panel {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: calc(64px + env(safe-area-inset-top, 0px));
-  bottom: 0;
-  z-index: 25;
-  background: var(--hm-bg);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  display: none;
   padding-top: 18px;
   padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   font-family: 'Geist', -apple-system, sans-serif;
   color: var(--hm-text, #fafafa);
-  transform: translateX(100%);
-  visibility: hidden;
-  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.26s;
 }
 .trd-panel[hidden] { display: none; }
-.trd-panel.open { transform: none; visibility: visible; transition-delay: 0s; }
+.trd-panel.open { display: block; }
 .trd-panel button, .trd-panel input { font-family: inherit; }
 
 .trd-col { display: flex; flex-direction: column; gap: 8px; }
