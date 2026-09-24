@@ -24,6 +24,8 @@
   <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="currentColor"/></symbol>
   <symbol id="i-verified" viewBox="0 0 24 24"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-stack" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="14" width="16" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="7" r="1" fill="currentColor"/><circle cx="8" cy="17" r="1" fill="currentColor"/></symbol>
 </svg>
 
 <div class="hm-col">
@@ -69,10 +71,11 @@
   </section>
 
   <section class="hm-card">
-    <div class="hm-card-head">
+    <button class="hm-card-head hm-card-link" id="hm-hold-open" type="button" aria-label="View all holdings">
       <h2>Portfolio</h2>
+      <span class="hm-viewall">View All</span>
       <svg class="hm-icon" width="20" height="20"><use href="#i-chevron"/></svg>
-    </div>
+    </button>
     <div class="hm-rows" id="hm-hold-rows"></div>
     <p class="hm-empty" id="hm-hold-empty">Connect wallet</p>
   </section>
@@ -92,6 +95,24 @@
     <p class="hm-empty" id="stk-empty">Loading…</p>
   </div>
 </section>
+
+<div class="hld-root" id="hld-root" hidden>
+  <div class="hld-backdrop" id="hld-backdrop"></div>
+  <section class="hld-sheet" id="hld-sheet" role="dialog" aria-modal="true" aria-label="Holdings">
+    <div class="hld-handle"></div>
+    <div class="hld-head">
+      <h3 class="hld-title">Holdings</h3>
+      <button type="button" class="hld-close" id="hld-close" aria-label="Close">
+        <svg width="20" height="20"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <div class="hld-rows" id="hld-rows"></div>
+    <div class="hld-empty" id="hld-empty" hidden>
+      <svg class="hld-empty-ic" width="72" height="72"><use href="#i-stack"/></svg>
+      <p>No Holdings yet</p>
+    </div>
+  </section>
+</div>
 {% endblock %}
 
 {% block footer %}
