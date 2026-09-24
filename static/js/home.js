@@ -45,6 +45,7 @@
     hldClose: $('hld-close'),
     hldRows: $('hld-rows'),
     hldEmpty: $('hld-empty'),
+    hldDisc: $('hld-disc'),
   };
 
   const state = {
@@ -408,6 +409,7 @@
     const rows = state.address && state.holdings ? computePortfolio().rows : [];
     syncList(els.hldRows, rows, (r) => r.symbol, buildHoldRow, updateHoldRow);
     els.hldEmpty.hidden = rows.length > 0;
+    els.hldRows.hidden = rows.length === 0;
   }
 
   function openHldModal() {
@@ -435,6 +437,10 @@
   if (els.holdOpen) els.holdOpen.addEventListener('click', openHldModal);
   els.hldBackdrop.addEventListener('click', closeHldModal);
   els.hldClose.addEventListener('click', closeHldModal);
+  els.hldDisc.addEventListener('click', async () => {
+    closeHldModal();
+    if (window.MarktapeWallet) await window.MarktapeWallet.disconnect();
+  });
   els.hldRows.addEventListener('click', (e) => {
     const row = e.target.closest('a.hm-row');
     if (!row) return;

@@ -384,7 +384,10 @@
     const btn = document.getElementById('mkt-connect-btn');
     if (!btn) return;
     const idleLabel = btn.textContent;
+    let menu = null;
+
     function paint(address) {
+      closeMenu();
       if (address) {
         btn.textContent = `${address.slice(0, 4)}…${address.slice(-4)}`;
         btn.classList.add('connected');
@@ -393,10 +396,91 @@
         btn.classList.remove('connected');
       }
     }
+
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+      }
+      legacyCopy(text);
+      return Promise.resolve();
+    }
+
+    function legacyCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+    }
+
+    function closeMenu() {
+      if (!menu) return;
+      menu.remove();
+      menu = null;
+      document.removeEventListener('pointerdown', onOutside, true);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', closeMenu);
+      window.removeEventListener('scroll', closeMenu, true);
+    }
+
+    function onOutside(e) {
+      if (menu && !menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') closeMenu();
+    }
+
+    function openMenu() {
+      const rect = btn.getBoundingClientRect();
+      menu = document.createElement('div');
+      menu.className = 'mkt-wallet-menu';
+      menu.setAttribute('role', 'menu');
+      menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+      menu.style.right = `${Math.round(document.documentElement.clientWidth - rect.right)}px`;
+      menu.style.width = `${Math.round(rect.width)}px`;
+
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'mkt-wallet-menu-item';
+      copy.setAttribute('role', 'menuitem');
+      copy.textContent = 'Copy Address';
+      let timer = null;
+      copy.addEventListener('click', async () => {
+        const address = getAddress();
+        if (!address) return;
+        await copyText(address);
+        copy.textContent = 'Copied';
+        clearTimeout(timer);
+        timer = setTimeout(() => { copy.textContent = 'Copy Address'; }, 2000);
+      });
+
+      const disc = document.createElement('button');
+      disc.type = 'button';
+      disc.className = 'mkt-wallet-menu-item danger';
+      disc.setAttribute('role', 'menuitem');
+      disc.textContent = 'Disconnect wallet';
+      disc.addEventListener('click', async () => {
+        closeMenu();
+        await disconnect();
+      });
+
+      menu.appendChild(copy);
+      menu.appendChild(disc);
+      document.body.appendChild(menu);
+      document.addEventListener('pointerdown', onOutside, true);
+      document.addEventListener('keydown', onKey);
+      window.addEventListener('resize', closeMenu);
+      window.addEventListener('scroll', closeMenu, true);
+    }
+
     window.addEventListener('marktape:wallet', (e) => paint(e.detail.address));
     btn.addEventListener('click', async () => {
       if (getAddress()) {
-        if (window.confirm('Disconnect wallet?')) await disconnect();
+        if (menu) closeMenu(); else openMenu();
         return;
       }
       await connectWithPicker();
