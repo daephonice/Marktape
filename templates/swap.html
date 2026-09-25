@@ -14,6 +14,7 @@
     <span class="tk-id" style="margin-left:8px">
       <span class="tk-sym" style="font-size:1.05rem;font-weight:600">Swap</span>
     </span>
+    <button class="mkt-connect-btn" id="mkt-connect-btn" type="button">Connect wallet</button>
   </div>
 </header>
 {% endblock %}
@@ -27,6 +28,7 @@
 {% block scripts %}
 <script src="/static/js/send.js?v={{ static_v('js/send.js') }}"></script>
 <script src="/static/js/trade.js?v={{ static_v('js/trade.js') }}"></script>
+<script src="/static/js/swap-page.js?v={{ static_v('js/swap-page.js') }}"></script>
 <script>
 (function () {
   document.addEventListener('keydown', function (e) {
