@@ -37,7 +37,18 @@ async def swap_page(request: Request):
 
 @router.get("/lend", response_class=HTMLResponse)
 async def lend_page(request: Request):
-    return templates.TemplateResponse(request, "lend.html", {})
+    return templates.TemplateResponse(request, "lend.html", {"lend_symbol": None})
+
+
+@router.get("/lend/{symbol}", response_class=HTMLResponse)
+async def lend_vault_page(request: Request, symbol: str):
+    asset = prices.get_asset(symbol)
+    if asset is None:
+        await prices.wait_ready()
+        asset = prices.get_asset(symbol)
+    if asset is None or asset.get("kind") != "stock":
+        raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
+    return templates.TemplateResponse(request, "lend.html", {"lend_symbol": asset["symbol"]})
 
 
 @router.get("/t/{symbol}", response_class=HTMLResponse)

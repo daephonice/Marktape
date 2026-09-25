@@ -12,6 +12,7 @@ import chart
 import prices
 import send
 import news
+import lend as lend_mod
 
 log = logging.getLogger("routes_api")
 
@@ -174,6 +175,84 @@ async def swap_execute(body: SwapExecuteRequest):
 def _ip(request: Request) -> str:
     fwd = request.headers.get("x-forwarded-for", "")
     return fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
+
+
+class LendQuoteRequest(BaseModel):
+    collateralSymbol: str
+    debtSymbol: str
+    colAmount: float = 0
+    debtAmount: float = 0
+    user: str | None = None
+
+
+class LendOperateRequest(BaseModel):
+    signer: str
+    collateralSymbol: str
+    debtSymbol: str
+    colAmount: float = 0
+    debtAmount: float = 0
+
+
+class LendLiquidateRequest(BaseModel):
+    wallet: str
+    collateralSymbol: str
+    debtSymbol: str
+
+
+@router.get("/lend/vaults")
+async def api_lend_vaults():
+    if not prices.get_assets().get("assets"):
+        await prices.wait_ready()
+    return {"demo": True, "vaults": lend_mod.list_vaults()}
+
+
+@router.get("/lend/positions")
+async def api_lend_positions(user: str):
+    if not lend_mod.valid_wallet(user):
+        raise HTTPException(status_code=400, detail="Invalid address")
+    return {"demo": True, "positions": lend_mod.list_positions(user)}
+
+
+@router.post("/lend/quote")
+async def api_lend_quote(body: LendQuoteRequest):
+    try:
+        return lend_mod.quote(
+            body.collateralSymbol, body.debtSymbol, body.colAmount, body.debtAmount, body.user
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.post("/lend/operate")
+async def api_lend_operate(body: LendOperateRequest):
+    try:
+        return lend_mod.operate(
+            body.signer, body.collateralSymbol, body.debtSymbol, body.colAmount, body.debtAmount
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        log.warning("lend operate failed", exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not update position")
+
+
+@router.get("/lend/liquidatable")
+async def api_lend_liquidatable():
+    return {"positions": lend_mod.list_liquidatable()}
+
+
+@router.post("/lend/liquidate")
+async def api_lend_liquidate(body: LendLiquidateRequest):
+    try:
+        return lend_mod.liquidate(body.wallet, body.collateralSymbol, body.debtSymbol)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 class SendBuildRequest(BaseModel):

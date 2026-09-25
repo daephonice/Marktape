@@ -38,6 +38,13 @@ _client: httpx.AsyncClient | None = None
 _balance_cache: dict[str, tuple[float, dict]] = {}
 
 
+def invalidate(address: str | None = None) -> None:
+    if address:
+        _balance_cache.pop(address, None)
+    else:
+        _balance_cache.clear()
+
+
 def _http() -> httpx.AsyncClient:
     global _client
     if _client is None or _client.is_closed:
@@ -113,6 +120,12 @@ async def get_balances(address: str) -> dict:
     for (_, symbol), amount in zip(held_stocks, amounts):
         if amount > 0:
             holdings[symbol] = amount
+
+    try:
+        import lend as lend_mod
+        lend_mod.overlay_holdings(address, holdings)
+    except Exception:
+        log.warning("balances: lend overlay failed for %s", address, exc_info=True)
 
     data = {"holdings": holdings}
     if len(_balance_cache) > 500:
