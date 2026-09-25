@@ -30,15 +30,16 @@ async def build_snapshot() -> dict:
             log.warning("board: PreStocks fetch failed, keeping last-good snapshot", exc_info=True)
             return prestocks.get_cached_snapshot()
 
-        rows = []
-        for r in records:
+        async def _row(r):
             mint = r["contract_address"]
             try:
                 m = await multiplier_mod.get_mint_multiplier(mint, client)
                 mult = m["multiplier"]
             except Exception:
                 mult = 1.0
-            rows.append(prestocks.normalize_row(r, multiplier=mult))
+            return prestocks.normalize_row(r, multiplier=mult)
+
+        rows = await asyncio.gather(*(_row(r) for r in records))
 
         # Best-effort executable price overlay — never blocks the board.
         try:

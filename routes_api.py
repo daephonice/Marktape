@@ -202,7 +202,7 @@ class LendLiquidateRequest(BaseModel):
 @router.get("/lend/vaults")
 async def api_lend_vaults():
     if not prices.get_assets().get("assets"):
-        await prices.wait_ready()
+        await prices.wait_ready(timeout=1.5)
     return {"demo": True, "vaults": lend_mod.list_vaults()}
 
 
