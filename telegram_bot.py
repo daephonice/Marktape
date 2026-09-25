@@ -24,11 +24,12 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 
 from sqlalchemy import select
 
+import news
 import prestocks
 import prices
 from database import SessionLocal
@@ -135,9 +136,9 @@ def _live_board_markup(rows: list[dict]) -> InlineKeyboardMarkup:
     """2 cols x 4 rows of PreStock symbols (same order as the price list),
     plus SOL full-width as the CTA row. Display-only: callback_data is a
     stub and no handler is registered for it."""
-    buttons = [InlineKeyboardButton(text=r["symbol"], callback_data=f"noop:{r['symbol']}") for r in rows]
+    buttons = [InlineKeyboardButton(text=r["symbol"], callback_data=f"tok:{r['symbol']}") for r in rows]
     kb: list[list[InlineKeyboardButton]] = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
-    kb.append([InlineKeyboardButton(text="SOL", callback_data="noop:SOL")])
+    kb.append([InlineKeyboardButton(text="SOL", callback_data="tok:SOL")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
@@ -145,6 +146,118 @@ def _live_board_markup(rows: list[dict]) -> InlineKeyboardMarkup:
 # only (spec: no DB). A new /start (no payload) replaces the old target.
 _live_boards: dict[int, int] = {}
 _live_board_lock = asyncio.Lock()
+
+# chat_id -> message_id currently showing a token menu (not the live board).
+# The live board editor skips these chats until Back is pressed.
+_token_menus: dict[int, int] = {}
+_token_menus_lock = asyncio.Lock()
+
+
+def _is_watching(chat_id: int, symbol: str) -> bool:
+    db = SessionLocal()
+    try:
+        return db.execute(
+            select(Watch.id).where(Watch.chat_id == chat_id, Watch.symbol == symbol.upper())
+        ).first() is not None
+    finally:
+        db.close()
+
+
+def _token_menu_text(symbol: str) -> str | None:
+    symbol_u = symbol.upper()
+    if symbol_u == "SOL":
+        live = prices.get_prices()
+        sol = (live or {}).get("prices", {}).get("SOL")
+        asset = prices.get_asset("SOL")
+        if not sol or not asset:
+            return None
+        price = f"${sol['price']:.2f}" if sol.get("price") is not None else "—"
+        lines = [f"<b>SOL</b> — {asset['name']}", f"Tape {price}"]
+        if asset.get("description"):
+            lines.append(f"\n{asset['description']}")
+        return "\n".join(lines)
+
+    row = _row_for(symbol_u)
+    asset = prices.get_asset(symbol_u)
+    if not row or not asset:
+        return None
+    pct = prestocks.format_premium(row["premium"])
+    lines = [
+        f"<b>{row['symbol']}</b> — {row.get('name', '')}",
+        f"Tape ${row['tokenPrice']:.2f} · Mark ${row['markPrice']:.2f} · {pct}",
+    ]
+    if asset.get("description"):
+        lines.append(f"\n{asset['description']}")
+
+    item = next((n for n in news.get_news() if n["symbol"].upper() == symbol_u), None)
+    if item:
+        lines.append(f"\n📰 {item['body']}")
+
+    jup_link = f"{JUPITER_DEEP_BASE}/{prestocks.USDC_MINT}-{row['mint']}"
+    lines.append(f"\nCHECK ON JUPITER\n{jup_link}")
+    return "\n".join(lines)
+
+
+def _token_menu_markup(chat_id: int, symbol: str) -> InlineKeyboardMarkup:
+    symbol_u = symbol.upper()
+    watch_label = "Watching 👁️" if _is_watching(chat_id, symbol_u) else "Watch 👁️"
+    kb = [[
+        InlineKeyboardButton(text=watch_label, callback_data=f"watch:{symbol_u}"),
+        InlineKeyboardButton(text="Unwatch ❌", callback_data=f"unwatch:{symbol_u}"),
+    ]]
+    if symbol_u != "SOL":
+        kb.append([InlineKeyboardButton(text="Open on Marktape", url=f"{WEB_PUBLIC_URL}/t/{symbol_u}")])
+    kb.append([InlineKeyboardButton(text="◀ Back", callback_data="back:board")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+@router.callback_query(lambda c: c.data and c.data.startswith("tok:"))
+async def on_token_tap(callback: CallbackQuery):
+    symbol = callback.data.split(":", 1)[1]
+    text = _token_menu_text(symbol)
+    if not text:
+        await callback.answer()
+        return
+    chat_id = callback.message.chat.id
+    markup = _token_menu_markup(chat_id, symbol)
+    try:
+        await callback.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
+    async with _token_menus_lock:
+        _token_menus[chat_id] = callback.message.message_id
+    await callback.answer()
+
+
+@router.callback_query(lambda c: c.data == "back:board")
+async def on_back(callback: CallbackQuery):
+    chat_id = callback.message.chat.id
+    rows = _live_rows()
+    if rows:
+        text = (
+            "Marktape — mark vs tape for PreStocks.\n"
+            "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n\n"
+        ) + _live_board_text(rows)
+        markup = _live_board_markup(rows)
+    else:
+        text = "Board is warming up — try again in a moment."
+        markup = None
+    try:
+        await callback.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
+    async with _token_menus_lock:
+        _token_menus.pop(chat_id, None)
+    async with _live_board_lock:
+        _live_boards[chat_id] = callback.message.message_id
+    await callback.answer()
+
+
+@router.callback_query(lambda c: c.data and (c.data.startswith("watch:") or c.data.startswith("unwatch:")))
+async def on_watch_toggle(callback: CallbackQuery):
+    await callback.answer("Not implemented yet")
 
 
 @router.message(Command("start"))
@@ -356,6 +469,9 @@ async def _run_live_board_pass(bot: Bot):
 
     async with _live_board_lock:
         targets = list(_live_boards.items())
+    async with _token_menus_lock:
+        on_token_menu = set(_token_menus.keys())
+    targets = [(c, m) for c, m in targets if c not in on_token_menu]
 
     dead: list[tuple[int, int]] = []  # (chat_id, message_id) pairs to drop
     for chat_id, message_id in targets:
