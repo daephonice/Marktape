@@ -23,6 +23,8 @@
     notice: $('hm-lock-notice'),
     stockRows: $('hm-stock-rows'),
     stockEmpty: $('hm-stock-empty'),
+    stockToggle: $('hm-stock-toggle'),
+    stocks: $('hm-stocks'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
     holdOpen: $('hm-hold-open'),
@@ -46,6 +48,7 @@
     top: [],
     topAt: 0,
     news: null,
+    stocksOpen: false,
   };
 
   // ---- Formatting ---------------------------------------------------------
@@ -257,16 +260,58 @@
     return state.top;
   }
 
-  function buildStockRow(sym) { return rowShell(sym, { badge: true }); }
+  function fmtPrem(p) {
+    if (p === null || p === undefined || !isFinite(p)) return '—';
+    const pctv = p * 100;
+    const r = Number(pctv.toFixed(1));
+    return (r > 0 ? '+' : '') + r.toString() + '%';
+  }
+
+  function premCls(p) {
+    if (!(p > 0) && !(p < 0)) return 'flat';
+    return p > 0 ? 'pos' : 'neg';
+  }
+
+  function pickAll() {
+    const syms = stockSyms();
+    syms.sort((a, b) => mcOf(b) - mcOf(a) || a.localeCompare(b));
+    return syms;
+  }
+
+  function buildStockRow(sym) {
+    const row = h('a', 'hm-stk-row');
+    row.href = '/t/' + encodeURIComponent(sym);
+
+    const token = h('div', 'hm-stk-token');
+    const lg = logo(sym, 32);
+    lg.appendChild(badgeEl());
+    token.appendChild(lg);
+    const id = h('div', 'hm-stk-id');
+    const name = h('div', 'hm-sym');
+    name.appendChild(h('span', 'hm-sym-text', sym));
+    name.appendChild(icon('i-verified', 13, 'hm-verified'));
+    id.appendChild(name);
+    id.appendChild(h('div', 'hm-stk-chg'));
+    token.appendChild(id);
+    row.appendChild(token);
+
+    ['price', 'mc', 'mark', 'prem'].forEach((k) => {
+      row.appendChild(h('div', 'hm-stk-cell hm-stk-' + k));
+    });
+    return row;
+  }
 
   function updateStockRow(node, sym) {
-    const p = state.prices[sym];
-    const sub = node.querySelector('.hm-sub');
-    sub.textContent = p && p.mc ? `${fmtCompact(p.mc)} MC` : '';
-    node.querySelector('.hm-side-top').textContent = p ? fmtPrice(p.price) : '—';
-    const bot = node.querySelector('.hm-side-bot');
-    bot.className = 'hm-side-bot';
-    setPct(bot, p ? p.change24h : null);
+    const p = state.prices[sym] || {};
+    const chg = node.querySelector('.hm-stk-chg');
+    chg.className = 'hm-stk-chg';
+    setPct(chg, p.change24h);
+    node.querySelector('.hm-stk-price').textContent = p.price ? fmtPrice(p.price) : '—';
+    node.querySelector('.hm-stk-mc').textContent = p.mc ? fmtCompact(p.mc) : '—';
+    node.querySelector('.hm-stk-mark').textContent = p.mark ? fmtPrice(p.mark) : '—';
+    const prem = node.querySelector('.hm-stk-prem');
+    prem.textContent = fmtPrem(p.premium);
+    prem.className = 'hm-stk-cell hm-stk-prem ' + premCls(p.premium);
   }
 
   function buildHoldRow(item) {
@@ -287,10 +332,25 @@
   }
 
   function renderStocks() {
-    const top = pickTop();
-    syncList(els.stockRows, top, (s) => s, buildStockRow, updateStockRow);
-    els.stockEmpty.hidden = top.length > 0;
+    const all = pickAll();
+    const rows = state.stocksOpen ? all : pickTop();
+    syncList(els.stockRows, rows, (s) => s, buildStockRow, updateStockRow);
+    els.stockEmpty.hidden = rows.length > 0;
     els.stockEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
+    if (els.stockToggle) {
+      els.stockToggle.hidden = all.length <= LIST_MAX;
+      const label = els.stockToggle.querySelector('.hm-n-toggle-text');
+      if (label) label.textContent = state.stocksOpen ? 'View less' : 'View all';
+      els.stockToggle.classList.toggle('open', state.stocksOpen);
+      if (els.stocks) els.stocks.classList.toggle('open', state.stocksOpen);
+    }
+  }
+
+  if (els.stockToggle) {
+    els.stockToggle.addEventListener('click', () => {
+      state.stocksOpen = !state.stocksOpen;
+      renderStocks();
+    });
   }
 
   function renderHoldings() {

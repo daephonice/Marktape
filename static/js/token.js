@@ -20,7 +20,7 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     price: $('tk-price'), chg: $('tk-chg'), chgAbs: $('tk-chg-abs'), chgPct: $('tk-chg-pct'),
-    stat: $('tk-stat'), mc: $('tk-mc'),
+    stats: $('tk-stats'), mc: $('tk-mc'), mark: $('tk-mark'), prem: $('tk-prem'),
     plot: $('tk-plot'), axis: $('tk-axis'), noHist: $('tk-nohist'), ranges: $('tk-ranges'),
     pos: $('tk-pos'), posVal: $('tk-pos-val'), posAmt: $('tk-pos-amt'), posDelta: $('tk-pos-delta'), posPct: $('tk-pos-pct'), posPnl: $('tk-pos-pnl'),
     bar: $('tk-bar'), send: $('tk-send'), sell: $('tk-sell'), buy: $('tk-buy'),
@@ -88,8 +88,22 @@
       els.chgPct.textContent = info.text;
       setTone(els.chgPct, 'tk-pill', info.cls);
     }
-    els.stat.hidden = !(p && p.mc);
-    if (p && p.mc) els.mc.textContent = fmtCompact(p.mc);
+    if (els.stats) {
+      const show = !!p;
+      els.stats.hidden = !show;
+      if (show) {
+        els.mc.textContent = p.mc ? fmtCompact(p.mc) : '—';
+        els.mark.textContent = p.mark ? fmtPrice(p.mark) : '—';
+        if (p.premium === null || p.premium === undefined || !isFinite(p.premium)) {
+          els.prem.textContent = '—';
+          els.prem.className = '';
+        } else {
+          const pctv = Number((p.premium * 100).toFixed(1));
+          els.prem.textContent = (pctv > 0 ? '+' : '') + pctv + '%';
+          els.prem.className = pctv > 0 ? 'pos' : pctv < 0 ? 'neg' : 'flat';
+        }
+      }
+    }
 
     // Portfolio card + bottom bar
     const amount = state.address && state.holdings ? state.holdings[SYMBOL] || 0 : 0;
