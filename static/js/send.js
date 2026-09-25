@@ -469,9 +469,9 @@
     }
   }
 
-  function toast(text) {
+  function toast(text, kind) {
     const el = document.createElement('div');
-    el.className = 'snd-toast';
+    el.className = 'snd-toast' + (kind === 'error' ? ' err' : '');
     el.setAttribute('role', 'status');
     el.innerHTML = ICON.check + '<span></span>';
     el.lastChild.textContent = text;

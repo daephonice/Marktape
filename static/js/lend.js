@@ -52,8 +52,8 @@
     busy: false,
   };
 
-  function toast(text) {
-    if (window.MarktapeSend && window.MarktapeSend.toast) window.MarktapeSend.toast(text);
+  function toast(text, kind) {
+    if (window.MarktapeSend && window.MarktapeSend.toast) window.MarktapeSend.toast(text, kind);
   }
 
   function logo(sym, size) {
@@ -309,11 +309,15 @@
       await loadVaults();
       paintVault();
     } catch (err) {
-      $('act-preview').textContent = err.message || 'Failed';
-    } finally {
       state.busy = false;
       paintCta();
+      const msg = err.message || 'Failed';
+      $('act-preview').textContent = msg;
+      toast(msg, 'error');
+      return;
     }
+    state.busy = false;
+    paintCta();
   }
 
   async function doLiq() {
@@ -329,13 +333,26 @@
       await loadHoldings();
       paintVault();
     } catch (err) {
-      $('act-preview').textContent = err.message || 'Failed';
+      const msg = err.message || 'Failed';
+      $('act-preview').textContent = msg;
+      toast(msg, 'error');
     }
   }
 
   async function loadVaults() {
     const data = await jget('/api/lend/vaults');
     state.vaults = data.vaults || [];
+    if (!state.vaults.length) {
+      // Cold start: prices/board loop may not have populated yet. Retry a
+      // couple of times fast instead of leaving the page stuck on "Loading…".
+      for (let i = 0; i < 3 && !state.vaults.length; i++) {
+        await new Promise((r) => setTimeout(r, 700));
+        const retry = await jget('/api/lend/vaults');
+        state.vaults = retry.vaults || [];
+        paintMarkets();
+        if (state.symbol) paintVault();
+      }
+    }
   }
   async function loadPositions() {
     if (!state.address) { state.positions = []; return; }
