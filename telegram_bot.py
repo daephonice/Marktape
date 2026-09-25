@@ -264,9 +264,15 @@ async def on_watch_toggle(callback: CallbackQuery):
 async def on_start(message: Message, command: CommandObject):
     payload = (command.args or "").strip()
     if payload:
-        row = _row_for(payload)
-        if row:
-            await message.answer(_card_text(row), disable_web_page_preview=True)
+        text = _token_menu_text(payload)
+        if text:
+            symbol_u = payload.upper().lstrip("/")
+            chat_id = message.chat.id
+            sent = await message.answer(
+                text, reply_markup=_token_menu_markup(chat_id, symbol_u), disable_web_page_preview=True
+            )
+            async with _token_menus_lock:
+                _token_menus[chat_id] = sent.message_id
             return
 
     text = (
