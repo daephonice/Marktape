@@ -15,8 +15,6 @@
 
   const $ = (id) => document.getElementById(id);
   const els = {
-    stack: $('hm-stack'),
-    dashboard: $('hm-dashboard'),
     total: $('hm-total'),
     change: $('hm-change'),
     changeText: $('hm-change-text'),

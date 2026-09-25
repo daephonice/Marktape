@@ -1,14 +1,13 @@
-/* Trade (Swap) panel — homepage full-panel, blue theme.
+/* Trade (Swap) panel — /swap page, blue theme.
  * Sell card / swap-direction button / Buy card (read-only) / rate+gasless+
  * warning row / CTA. No in-site keyboard — the native mobile keyboard drives
  * the amount input. Debounced Jupiter Ultra order fetch ("Getting Price...")
- * while typing; warning icon opens a Price Info modal; on success the panel
- * closes and MarktapeSend.toast() shows the shared blue toast.
+ * while typing; warning icon opens a Price Info modal; on success
+ * MarktapeSend.toast() shows the shared blue toast.
  *
- * Host (home.js) calls MarktapeTrade.open({ getCtx, onDone }) to open the
- * panel and MarktapeTrade.setOpen(bool) to drive it from the pager screen /
- * URL. getCtx() -> { address, holdings, prices, assets } (live state, same
- * shape as send.js's getCtx).
+ * Host (swap-page.js) calls MarktapeTrade.mount(#trd-slot) then
+ * MarktapeTrade.open({ getCtx, onDone }). getCtx() ->
+ * { address, holdings, prices, assets } (live state, same shape as send.js).
  *
  * Non-custodial: /api/swap/order builds the Ultra order server-side (the API
  * key never reaches the browser), the wallet signs, /api/swap/execute
@@ -197,7 +196,14 @@
     R.infoRow.addEventListener('click', openInfo);
     R.infoBack.addEventListener('click', closeInfo);
     R.infoClose.addEventListener('click', closeInfo);
-    R.cta.addEventListener('click', doSwap);
+    R.cta.addEventListener('click', () => {
+      if (!S) return;
+      if (!S.address && window.MarktapeWallet) {
+        window.MarktapeWallet.connectWithPicker();
+        return;
+      }
+      doSwap();
+    });
 
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || !S) return;
@@ -455,7 +461,7 @@
     const amt = parseFloat(S.sellRaw) || 0;
     const c = S.host.getCtx();
     const bal = c.holdings[S.sell] || 0;
-    if (!S.address) { b.textContent = 'Connect wallet'; b.disabled = true; return; }
+    if (!S.address) { b.textContent = 'Connect wallet'; b.disabled = false; return; }
     if (!(amt > 0)) { b.textContent = 'Enter Amount'; b.disabled = true; return; }
     if (amt > bal * (1 + 1e-9)) { b.textContent = 'Insufficient Balance'; b.disabled = true; return; }
     if (S.quoting) { b.textContent = 'Getting Price....'; b.disabled = true; return; }
@@ -597,6 +603,7 @@
 
   function isOpen() { return !!S; }
   function panelEl() { build(); return root; }
+  function refresh() { if (S) render(); }
 
-  window.MarktapeTrade = { open, close, isOpen, panelEl, mount };
+  window.MarktapeTrade = { open, close, isOpen, panelEl, mount, refresh };
 })();
