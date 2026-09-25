@@ -21,7 +21,7 @@ Built for Solana Stocklana, PreStocks track.
 Universe is **only** mints returned by `https://prestocks.com/api/prestocks`.  
 No Tessera. No xStocks. No other pre-IPO issuer.
 
-## How to judge this (five minutes)
+## How to test the site (in five minutes)
 
 Use a **new empty Solana wallet**. Do not connect the wallet you actually fund.
 
