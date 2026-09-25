@@ -240,7 +240,7 @@ a.hm-action-btn { cursor: pointer; }
 .hm-n-head { display: flex; align-items: center; gap: 10px; }
 .hm-n-head .hm-sym { flex: 1; }
 .hm-n-time { font-size: 14px; color: var(--hm-dim); flex-shrink: 0; }
-.hm-n-line { margin-top: 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.hm-n-line { margin-top: 12px; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hm-n-body {
   margin: 8px 0 0;
   font-size: 15px;
@@ -270,14 +270,18 @@ a.hm-action-btn { cursor: pointer; }
 .hm-n-toggle-icon { transition: transform 0.2s ease; }
 
 .hm-stocks { margin-top: 28px; }
-.hm-stk-rows { display: flex; flex-direction: column; }
+.hm-stk-rows { display: flex; flex-direction: column; gap: 10px; }
 .hm-stk-row {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--hm-line);
+  display: block;
+  background: var(--hm-card);
+  border-radius: 20px;
+  padding: 12px;
 }
-.hm-stk-row:last-child { border-bottom: none; }
-.hm-stk-chg { font-size: 14px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.hm-stk-row .hm-sym { flex-shrink: 1; min-width: 0; }
+.hm-stk-row .hm-sym-text { flex-shrink: 1; }
+.hm-stk-chg { font-size: 13px; font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 2px; }
 .hm-n-line { line-height: 1.45; }
+.hm-n-dot { margin: 0 4px; }
 .hm-stocks .hm-n-toggle { margin-top: 10px; color: var(--accent); }
 .hm-stocks .hm-empty { padding: 20px 0; }
 
@@ -536,19 +540,18 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .tk-pill.pos { background: rgba(74, 222, 128, 0.12); }
 .tk-pill.flat { background: rgba(157, 158, 162, 0.12); }
 .tk-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px 16px;
   flex-shrink: 0;
 }
 .tk-stat {
   display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   text-align: right;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--hm-dim);
 }
 .tk-stat b { font-size: 14px; font-weight: 500; color: var(--hm-text); font-variant-numeric: tabular-nums; }
