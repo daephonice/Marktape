@@ -428,13 +428,39 @@ button.hm-card-link {
 button.hm-tab { background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; }
 button.hm-tab.active { background: var(--hm-ctrl-on); }
 
+/* ==========================================================================
+   Screen stack — Home / Stocks / Swap slide as one push-transition set,
+   like a single-stack navigator: only one screen visible at a time, the
+   outgoing one slides fully off as the incoming one slides fully in.
+   Order matches the bottom nav: home(0) < stocks(1) < swap(2). JS sets
+   data-active on #hm-stack and toggles .hm-enter-left/.hm-enter-right on
+   the target screen; this file only defines the geometry + easing.
+   ========================================================================== */
+.hm-stack {
+  position: relative;
+  overflow-x: clip;
+  width: 100%;
+}
+.hm-screen {
+  width: 100%;
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transform: translateX(0);
+}
+/* Mid-transition only: both screens are briefly position:absolute so they
+   overlap for the animation; JS removes this class once it settles back
+   to a single static (non-absolute) screen for normal document flow. */
+.hm-stack.hm-animating { display: block; }
+.hm-stack.hm-animating .hm-screen { position: absolute; top: 0; left: 0; }
+.hm-stack.hm-animating .hm-screen[hidden] { display: block !important; }
+.hm-screen.hm-off-right { transform: translateX(100%); }
+.hm-screen.hm-off-left { transform: translateX(-100%); }
+
 .stk-panel {
-  display: none;
   padding-top: 16px;
   padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
+  width: 100%;
 }
-.stk-panel.open { display: block; }
 
 /* ==========================================================================
    Holdings modal (View All -> Portfolio). Bottom sheet, like the Send menu.
@@ -606,15 +632,14 @@ html.trd-lock, html.trd-lock body { overflow: hidden; }
 html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 
 .trd-panel {
-  display: none;
   padding-top: 18px;
   padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   font-family: 'Geist', -apple-system, sans-serif;
   color: var(--hm-text, #fafafa);
+  width: 100%;
 }
 .trd-panel[hidden] { display: none; }
-.trd-panel.open { display: block; }
 .trd-panel button, .trd-panel input { font-family: inherit; }
 
 .trd-col { display: flex; flex-direction: column; gap: 8px; }
