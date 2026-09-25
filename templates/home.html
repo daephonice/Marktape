@@ -61,12 +61,21 @@
   </div>
   <p class="hm-lock-notice" id="hm-lock-notice">Connect Wallet to Access</p>
 
-  <section class="hm-card">
-    <div class="hm-card-head">
-      <h2>Stocks</h2>
+  <section class="hm-stocks" id="hm-stocks">
+    <h2 class="hm-news-title">Stocks</h2>
+    <div class="hm-stk-cols" aria-hidden="true">
+      <span>Token</span>
+      <span>Price</span>
+      <span>Mcap</span>
+      <span>Mark</span>
+      <span>Prem</span>
     </div>
-    <div class="hm-rows" id="hm-stock-rows"></div>
+    <div class="hm-stk-rows" id="hm-stock-rows"></div>
     <p class="hm-empty" id="hm-stock-empty">Loading…</p>
+    <button class="hm-n-toggle" id="hm-stock-toggle" type="button" hidden>
+      <span class="hm-n-toggle-text">View all</span>
+      <svg class="hm-n-toggle-icon" width="14" height="14"><use href="#i-chevron-down"/></svg>
+    </button>
   </section>
 
   <section class="hm-card">
