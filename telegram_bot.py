@@ -118,30 +118,61 @@ def _live_rows() -> list[dict]:
     return rows
 
 
-def _live_line(row: dict) -> str:
+def _watched_symbols(chat_id: int | None) -> set[str]:
+    if chat_id is None:
+        return set()
+    db = SessionLocal()
+    try:
+        rows = db.execute(select(Watch.symbol).where(Watch.chat_id == chat_id)).scalars().all()
+        return set(rows)
+    finally:
+        db.close()
+
+
+def _watched_by_chat(chat_ids: list[int]) -> dict[int, set[str]]:
+    if not chat_ids:
+        return {}
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            select(Watch.chat_id, Watch.symbol).where(Watch.chat_id.in_(chat_ids))
+        ).all()
+    finally:
+        db.close()
+    out: dict[int, set[str]] = {}
+    for chat_id, symbol in rows:
+        out.setdefault(chat_id, set()).add(symbol)
+    return out
+
+
+def _live_line(row: dict, watched: set[str]) -> str:
+    mark = "👁" if row["symbol"].upper() in watched else " "
     price = f"${row['price']:.2f}" if row["price"] is not None else "—"
     if row["change24h"] is not None:
         sign = "+" if row["change24h"] > 0 else ""
         pct = f"{sign}{row['change24h']:.1f}%"
     else:
         pct = prestocks.format_premium(row["premium"])
-    return f"{row['symbol']:<10} {price:>10}   {pct:>7}"
+    return f"{mark}{row['symbol']:<10} {price:>10}   {pct:>7}"
 
 
-def _sol_line() -> str | None:
+def _sol_line(watched: set[str]) -> str | None:
     live = prices.get_prices()
     sol = (live or {}).get("prices", {}).get("SOL")
     if not sol or sol.get("price") is None:
         return None
+    mark = "👁" if "SOL" in watched else " "
     price = f"${sol['price']:.2f}"
     chg = sol.get("change24h")
     pct = f"{'+' if chg and chg > 0 else ''}{chg:.1f}%" if chg is not None else "—"
-    return f"{'SOL':<10} {price:>10}   {pct:>7}"
+    return f"{mark}{'SOL':<10} {price:>10}   {pct:>7}"
 
 
-def _live_board_text(rows: list[dict]) -> str:
-    lines = [_live_line(r) for r in rows]
-    sol_line = _sol_line()
+def _live_board_text(rows: list[dict], chat_id: int | None = None, watched: set[str] | None = None) -> str:
+    if watched is None:
+        watched = _watched_symbols(chat_id)
+    lines = [_live_line(r, watched) for r in rows]
+    sol_line = _sol_line(watched)
     if sol_line:
         lines.append(sol_line)
     body = "\n".join(lines)
@@ -292,7 +323,7 @@ async def on_back(callback: CallbackQuery):
         text = (
             "Marktape — mark vs tape for PreStocks.\n"
             "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n\n"
-        ) + _live_board_text(rows)
+        ) + _live_board_text(rows, chat_id)
         markup = _live_board_markup(rows)
     else:
         text = "Board is warming up — try again in a moment."
@@ -364,7 +395,7 @@ async def on_start(message: Message, command: CommandObject):
     )
     rows = _live_rows()
     if rows:
-        text += _live_board_text(rows)
+        text += _live_board_text(rows, message.chat.id)
         markup = _live_board_markup(rows)
     else:
         text += "Board is warming up — try again in a moment."
@@ -617,7 +648,6 @@ async def _run_live_board_pass(bot: Bot):
     rows = _live_rows()
     if not rows:
         return
-    text = _live_board_text(rows)
     markup = _live_board_markup(rows)
 
     async with _live_board_lock:
@@ -625,9 +655,11 @@ async def _run_live_board_pass(bot: Bot):
     async with _token_menus_lock:
         on_token_menu = set(_token_menus.keys())
     targets = [(c, m) for c, m in targets if c not in on_token_menu]
+    watched_by_chat = _watched_by_chat([c for c, _ in targets])
 
     dead: list[tuple[int, int]] = []  # (chat_id, message_id) pairs to drop
     for chat_id, message_id in targets:
+        text = _live_board_text(rows, watched=watched_by_chat.get(chat_id, set()))
         try:
             await bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup)
         except TelegramBadRequest as e:
