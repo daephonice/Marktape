@@ -11,15 +11,15 @@
  * On success the sheet closes and the shared blue toast (send.js) shows
  * "Swap successful".
  *
- * TODO(swap-backend): executeSwap() is a stub that only simulates the wait.
- * Replace it with the Jupiter Ultra flow (/api/swap/order -> wallet sign ->
- * /api/swap/execute) once the site's Swap feature is integrated.
+ * Non-custodial, same flow as trade.js: /api/swap/order builds the order
+ * server-side (debounced while typing / while the sell % changes), the
+ * connected wallet signs, /api/swap/execute relays the signed tx.
  */
 (function () {
   'use strict';
 
   const ANIM_MS = 260;
-  const SIM_MS = 1600;            // simulated swap time (stub)
+  const DEBOUNCE_MS = 450;
   const PAY = ['SOL', 'USDC'];
   const LOGO = { SOL: '/static/img/sol.svg', USDC: '/static/img/usdc.svg' };
   const DEC = { SOL: 9, USDC: 6 };
@@ -27,6 +27,23 @@
   const SOL_RESERVE = 0.003;      // kept back for network fees / new token account
   const STEP = 5;                 // - / + step for the sell percentage
   const TOKEN_DEC = 9;
+
+  async function postJSON(url, body) {
+    let resp;
+    try {
+      resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch (_) {
+      throw new Error('Network error, try again');
+    }
+    let data = null;
+    try { data = await resp.json(); } catch (_) {}
+    if (!resp.ok) {
+      const detail = data && data.detail;
+      const msg = typeof detail === 'string' ? detail : (detail && detail.message) || 'Something went wrong, try again';
+      throw new Error(msg);
+    }
+    return data;
+  }
 
   const usdFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -105,12 +122,14 @@
       if (!b || !S || S.busy) return;
       S.raw = b.dataset.amt;
       setNote('');
+      scheduleQuote();
       render();
     });
     R.input.addEventListener('input', () => {
       S.raw = sanitize(R.input.value, DEC[S.cur]);
       R.input.value = S.raw;
       setNote('');
+      scheduleQuote();
       render();
     });
     R.input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !R.cta.disabled) R.cta.click(); });
@@ -147,16 +166,80 @@
     S.cur = cur;
     S.raw = '';
     setNote('');
+    resetQuote();
     renderCur();
     renderQuick();
     render();
+    scheduleQuote();
   }
 
   function setPct(v) {
     if (S.busy) return;
     S.pct = Math.max(0, Math.min(100, Math.round(v)));
     setNote('');
+    scheduleQuote();
     render();
+  }
+
+  // ---- Quote ------------------------------------------------------------------
+  function resetQuote() {
+    if (!S) return;
+    S.order = null;
+    S.quoting = false;
+    clearTimeout(S.quoteTimer);
+    S.quoteReq = (S.quoteReq || 0) + 1;
+  }
+
+  function scheduleQuote() {
+    if (!S) return;
+    S.order = null;
+    clearTimeout(S.quoteTimer);
+    const amt = S.side === 'buy' ? parseFloat(S.raw) || 0 : sellCalcAmount();
+    if (!(amt > 0)) { S.quoting = false; return; }
+    S.quoting = true;
+    S.quoteTimer = setTimeout(fetchQuote, DEBOUNCE_MS);
+  }
+
+  function sellCalcAmount() {
+    if (!S) return 0;
+    const c = S.host.getCtx();
+    const bal = c.holdings[S.symbol] || 0;
+    return S.pct >= 100 ? bal : Math.floor(((bal * S.pct) / 100) * 10 ** TOKEN_DEC) / 10 ** TOKEN_DEC;
+  }
+
+  async function fetchQuote() {
+    if (!S) return;
+    const sess = S;
+    const reqId = ++sess.quoteReq;
+    const c = sess.host.getCtx();
+    const buying = sess.side === 'buy';
+    const inSym = buying ? sess.cur : sess.symbol;
+    const outSym = buying ? sess.symbol : sess.cur;
+    const inMint = (c.assets[inSym] || {}).mint;
+    const outMint = (c.assets[outSym] || {}).mint;
+    const amt = buying ? (parseFloat(sess.raw) || 0) : sellCalcAmount();
+    if (!inMint || !outMint || !(amt > 0)) { sess.quoting = false; render(); return; }
+    try {
+      const order = await postJSON('/api/swap/order', {
+        inputMint: inMint, outputMint: outMint, uiAmount: amt, taker: sess.address,
+      });
+      if (S !== sess || sess.quoteReq !== reqId) return;
+      sess.quoting = false;
+      if (!order.transaction) {
+        sess.order = null;
+        setNote(order.deepLink ? 'No route found for this pair' : 'No route found');
+      } else {
+        sess.order = order;
+        setNote('');
+      }
+      render();
+    } catch (err) {
+      if (S !== sess || sess.quoteReq !== reqId) return;
+      sess.quoting = false;
+      sess.order = null;
+      setNote(err.message || 'Could not get a price');
+      render();
+    }
   }
 
   // ---- Render -------------------------------------------------------------------
@@ -210,16 +293,16 @@
     const spendable = S.cur === 'SOL' ? Math.max(0, bal - SOL_RESERVE) : bal;
     const v = parseFloat(S.raw) || 0;
     const usdIn = v * price(c, S.cur);
-    const tokPrice = price(c, S.symbol);
-    return { bal, v, usdIn, out: tokPrice > 0 ? usdIn / tokPrice : 0, over: v > spendable + 1e-12 };
+    const out = S.order && S.order.uiOutAmount ? S.order.uiOutAmount : 0;
+    return { bal, v, usdIn, out, over: v > spendable + 1e-12 };
   }
 
   function sellCalc(c) {
     const bal = c.holdings[S.symbol] || 0;
-    const amt = S.pct >= 100 ? bal : Math.floor(((bal * S.pct) / 100) * 10 ** TOKEN_DEC) / 10 ** TOKEN_DEC;
+    const amt = sellCalcAmount();
     const usdOut = amt * price(c, S.symbol);
-    const curPrice = price(c, S.cur);
-    return { bal, amt, usdOut, out: curPrice > 0 ? usdOut / curPrice : 0 };
+    const out = S.order && S.order.uiOutAmount ? S.order.uiOutAmount : 0;
+    return { bal, amt, usdOut, out };
   }
 
   function render() {
@@ -241,6 +324,8 @@
       if (S.busy) setCta('Buying', true, true);
       else if (!(d.v > 0)) setCta('Enter an amount', true);
       else if (d.over) setCta(`Insufficient ${S.cur} balance`, true);
+      else if (S.quoting) setCta('Getting price...', true, true);
+      else if (!S.order || !S.order.uiOutAmount) setCta(`Buy with ${S.raw.replace(/\.$/, '')} ${S.cur}`, true);
       else setCta(`Buy with ${S.raw.replace(/\.$/, '')} ${S.cur}`, false);
       R.est.textContent = d.v > 0 && d.out > 0
         ? `You will receive ~${fmtTok(d.out)} ${S.symbol} ≈ ${usdFmt.format(d.usdIn)}`
@@ -256,6 +341,8 @@
       R.range.disabled = S.busy;
       if (S.busy) setCta('Selling', true, true);
       else if (!(d.amt > 0)) setCta('Select an amount', true);
+      else if (S.quoting) setCta('Getting price...', true, true);
+      else if (!S.order || !S.order.uiOutAmount) setCta(`Sell ${trunc(d.amt, TOKEN_DEC)} ${S.symbol}`, true);
       else setCta(`Sell ${trunc(d.amt, TOKEN_DEC)} ${S.symbol}`, false);
       R.est.textContent = d.amt > 0 && d.out > 0
         ? `You will receive ~${fmtTok(d.out)} ${S.cur} ≈ ${usdFmt.format(d.usdOut)}`
@@ -263,21 +350,34 @@
     }
   }
 
-  // ---- Swap (stub) ----------------------------------------------------------------
-  // TODO(swap-backend): replace with Jupiter Ultra order -> wallet sign -> execute.
-  function executeSwap(/* order */) {
-    return new Promise((resolve) => setTimeout(resolve, SIM_MS));
-  }
-
+  // ---- Swap -------------------------------------------------------------------
   async function doSwap() {
-    if (!S || S.busy || R.cta.disabled) return;
+    if (!S || S.busy || R.cta.disabled || !S.order || !S.order.transaction) return;
     const sess = S;
     sess.busy = true;
     setNote('');
     render();
     try {
-      await executeSwap({ side: sess.side, symbol: sess.symbol, cur: sess.cur, amount: sess.side === 'buy' ? sess.raw : sess.pct });
+      let signed;
+      try {
+        signed = await window.MarktapeWallet.signTransactionForSend(sess.order.transaction);
+      } catch (err) {
+        const rejected = (err && err.code === 4001) || /reject|declin|denied|cancel/i.test(String((err && err.message) || ''));
+        throw new Error(rejected ? 'Cancelled' : 'Wallet could not sign the transaction');
+      }
       if (S !== sess) return;
+
+      if (signed.signedTransactionBase64) {
+        const res = await postJSON('/api/swap/execute', {
+          signedTransaction: signed.signedTransactionBase64,
+          requestId: sess.order.requestId,
+          provider: sess.order.provider || 'ultra',
+        });
+        if (res.status && res.status !== 'Success' && res.status !== 'success') {
+          throw new Error('Swap failed on-chain, please try again');
+        }
+      }
+
       const host = sess.host;
       close();
       if (window.MarktapeSend && window.MarktapeSend.toast) window.MarktapeSend.toast('Swap successful');
@@ -293,6 +393,7 @@
   // ---- Public ---------------------------------------------------------------------
   function close() {
     if (!S) return;
+    clearTimeout(S.quoteTimer);
     S = null;
     R.input.blur();
     R.backdrop.classList.remove('open');
@@ -310,6 +411,7 @@
     S = {
       host, address: c.address, side: host.side === 'sell' ? 'sell' : 'buy', symbol: host.symbol,
       cur, raw: '', pct: 25, busy: false,
+      order: null, quoting: false, quoteTimer: null, quoteReq: 0,
     };
     R.title.textContent = `${S.side === 'buy' ? 'Buy' : 'Sell'} ${S.symbol}`;
     R.input.value = '';
@@ -326,6 +428,8 @@
     }));
     if (S.side === 'buy') {
       setTimeout(() => { if (S && S.side === 'buy') R.input.focus({ preventScroll: true }); }, ANIM_MS + 40);
+    } else {
+      scheduleQuote();
     }
   }
 
