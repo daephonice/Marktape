@@ -1,12 +1,8 @@
-/* Homepage. Everything is driven by three server-side sources:
- *   /api/prices           shared price cache (server refreshes it every second)
- *   /api/balances/{addr}  wallet holdings across the 11 accepted assets
+/* Homepage. Driven by:
+ *   /api/prices           shared price cache (refreshes every second)
+ *   /api/balances/{addr}  wallet holdings
  *   /api/news             news feed
- * Values are computed here: balance = sum(amount * price) over ALL holdings;
- * Portfolio shows the top 3 by USD value. The Stocks card shows the 3 PreStocks
- * with the biggest 24h move (re-ranked every 30s).
- * Every row links to its token page (/t/SYMBOL). Send opens the send flow
- * (send.js). Swap/Lend live on the Home|Swap|Lend pager. Lend is a Coming Soon stub.
+ * Send is wallet-gated. Swap → /swap. Lend → /lend.
  */
 (function () {
   const PRICE_MS = 1000;
@@ -20,18 +16,15 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     stack: $('hm-stack'),
-    track: $('hm-track'),
     dashboard: $('hm-dashboard'),
     total: $('hm-total'),
     change: $('hm-change'),
     changeText: $('hm-change-text'),
     actions: $('hm-actions'),
     sendBtn: $('hm-send-btn'),
-    swapBtn: $('hm-swap-btn'),
     notice: $('hm-lock-notice'),
     stockRows: $('hm-stock-rows'),
     stockEmpty: $('hm-stock-empty'),
-    lendBtn: $('hm-lend-btn'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
     holdOpen: $('hm-hold-open'),
@@ -48,13 +41,13 @@
 
   const state = {
     address: null,
-    holdings: null, // { SYMBOL: amount } once loaded
-    prices: {},     // { SYMBOL: { price, change24h, mc? } }
-    assets: {},     // { SYMBOL: { name, image, kind } }
-    loaded: false,  // first /api/prices response received
-    top: [],        // the 3 stocks shown on the home card
-    topAt: 0,       // when `top` was last ranked
-    news: null,     // null = loading, [] = none
+    holdings: null,
+    prices: {},
+    assets: {},
+    loaded: false,
+    top: [],
+    topAt: 0,
+    news: null,
   };
 
   // ---- Formatting ---------------------------------------------------------
@@ -82,7 +75,6 @@
     return v.toLocaleString('en-US', { maximumFractionDigits: max });
   }
 
-  // -1.2 -> { text: '-1.2%', cls: 'neg' }; up to `digits` decimals, trailing zeros trimmed
   function pct(p, digits) {
     if (p === null || p === undefined || !isFinite(p)) return null;
     const r = Number(p.toFixed(digits === undefined ? 2 : digits));
@@ -157,7 +149,6 @@
     el.hidden = !info;
   }
 
-  // Keeps existing nodes (no image flicker / lost state) and only adds, removes, reorders.
   function syncList(container, items, keyOf, create, update) {
     const existing = new Map();
     Array.from(container.children).forEach((c) => existing.set(c.dataset.key, c));
@@ -202,14 +193,6 @@
     els.sendBtn.classList.toggle('live', connected);
     if (connected) els.sendBtn.removeAttribute('aria-disabled');
     else els.sendBtn.setAttribute('aria-disabled', 'true');
-    if (els.swapBtn) {
-      els.swapBtn.classList.toggle('live', true);
-      els.swapBtn.removeAttribute('aria-disabled');
-    }
-    if (els.lendBtn) {
-      els.lendBtn.classList.toggle('live', true);
-      els.lendBtn.removeAttribute('aria-disabled');
-    }
 
     if (!connected) {
       els.total.textContent = '$0.00';
@@ -231,7 +214,7 @@
     els.change.style.visibility = 'visible';
   }
 
-  // ---- Rows (stocks / portfolio) -------------------------------------------
+  // ---- Rows ---------------------------------------------------------------
   function rowShell(sym, opts) {
     const row = h('a', 'hm-row');
     row.href = '/t/' + encodeURIComponent(sym);
@@ -261,8 +244,6 @@
 
   const mcOf = (sym) => (state.prices[sym] && state.prices[sym].mc) || 0;
 
-  // Top 3 by absolute 24h move (market cap breaks ties / covers missing history).
-  // Re-ranked at most every TOP_REFRESH_MS so the card doesn't jump every second.
   function pickTop() {
     const fresh = Date.now() - state.topAt < TOP_REFRESH_MS;
     if (fresh && state.top.length && state.top.every((s) => state.prices[s])) return state.top;
@@ -278,9 +259,7 @@
     return state.top;
   }
 
-  function buildStockRow(sym) {
-    return rowShell(sym, { badge: true });
-  }
+  function buildStockRow(sym) { return rowShell(sym, { badge: true }); }
 
   function updateStockRow(node, sym) {
     const p = state.prices[sym];
@@ -315,64 +294,6 @@
     els.stockEmpty.hidden = top.length > 0;
     els.stockEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
   }
-
-  // ---- Pager (Home | Swap | Lend) ---------------------------------
-  const SCREEN_ORDER = ['home', 'swap', 'lend'];
-  const SCREEN_PATH = { home: '/', swap: '/swap', lend: '/lend' };
-  let activeScreen = 'home';
-
-  function pathOf(name) { return SCREEN_PATH[name] || '/'; }
-
-  function screenFromPath(pathname) {
-    if (pathname === '/swap') return 'swap';
-    if (pathname === '/lend') return 'lend';
-    return 'home';
-  }
-
-  function goToScreen(name, instant, hist) {
-    if (SCREEN_ORDER.indexOf(name) < 0) name = 'home';
-    const i = SCREEN_ORDER.indexOf(name);
-    const prev = activeScreen;
-    activeScreen = name;
-    if (!els.track) return;
-    if (instant) els.track.classList.add('hm-no-anim');
-    els.track.style.transform = 'translate3d(' + (-i * 100) + '%,0,0)';
-    if (instant) {
-      els.track.offsetHeight;
-      els.track.classList.remove('hm-no-anim');
-    }
-    const pages = els.track.querySelectorAll('.hm-screen');
-    pages.forEach((p, k) => {
-      const on = k === i;
-      p.toggleAttribute('inert', !on);
-      p.style.pointerEvents = on ? 'auto' : 'none';
-    });
-    if (name === 'swap') ensureTrade();
-    if (hist !== false && pathOf(name) !== location.pathname) {
-      history.replaceState({ screen: name }, '', pathOf(name));
-    }
-    if (prev !== name && name !== 'home') window.scrollTo(0, 0);
-    requestAnimationFrame(syncScreenOverflow);
-  }
-
-  function syncScreenOverflow() {
-    if (!els.track) return;
-    els.track.querySelectorAll('.hm-screen').forEach((p) => {
-      p.classList.remove('hm-can-scroll');
-      const need = p.scrollHeight > p.clientHeight + 2;
-      p.classList.toggle('hm-can-scroll', need);
-      if (!need) p.scrollTop = 0;
-    });
-  }
-
-  window.addEventListener('popstate', () => {
-    goToScreen(screenFromPath(location.pathname), false, false);
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && activeScreen !== 'home' && !document.documentElement.classList.contains('snd-lock') && !document.documentElement.classList.contains('trd-tok-lock')) {
-      goToScreen('home');
-    }
-  });
 
   function renderHoldings() {
     const rows = state.address && state.holdings ? computePortfolio().rows.slice(0, LIST_MAX) : [];
@@ -519,7 +440,6 @@
     renderStocks();
     renderHoldings();
     renderNews();
-    requestAnimationFrame(syncScreenOverflow);
   }
 
   // ---- Data ---------------------------------------------------------------
@@ -537,8 +457,7 @@
     try {
       const data = await getJSON('/api/assets');
       state.assets = data.assets || {};
-      // logos are baked into rows on creation — rebuild so late metadata shows up
-      [els.stockRows, els.panelRows, els.holdRows, els.newsList].forEach((c) => { c.textContent = ''; });
+      [els.stockRows, els.holdRows, els.newsList].forEach((c) => { c.textContent = ''; });
       renderAll();
     } catch (err) { /* retry on a later tick */ }
   }
@@ -591,31 +510,10 @@
       getCtx: () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets }),
       onSent: () => {
         tickBalances();
-        setTimeout(tickBalances, 2500); // pick up the settled balance
+        setTimeout(tickBalances, 2500);
       },
     });
   });
-
-  // ---- Trade (Swap) ---------------------------------------------------------
-  function tradeHost() {
-    return {
-      getCtx: () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets }),
-      onDone: () => {
-        tickBalances();
-        setTimeout(tickBalances, 2500);
-      },
-    };
-  }
-
-  function ensureTrade() {
-    if (!window.MarktapeTrade) return;
-    window.MarktapeTrade.mount(document.getElementById('trd-slot'));
-    window.MarktapeTrade.open(tradeHost());
-  }
-
-  function openTrade() { goToScreen('swap'); }
-  if (els.swapBtn) els.swapBtn.addEventListener('click', openTrade);
-  if (els.lendBtn) els.lendBtn.addEventListener('click', () => goToScreen('lend'));
 
   // ---- Wallet -------------------------------------------------------------
   function setAddress(next) {
@@ -634,14 +532,11 @@
     tickBalances();
   });
 
-  window.addEventListener('resize', () => { measureNews(); syncScreenOverflow(); });
+  window.addEventListener('resize', () => { measureNews(); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureNews);
 
   // ---- Boot ---------------------------------------------------------------
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
-  if (window.MarktapeTrade) window.MarktapeTrade.mount(document.getElementById('trd-slot'));
-  const bootPanel = window.__MKT_OPEN_PANEL__ || screenFromPath(location.pathname);
-  goToScreen(bootPanel || 'home', true, false);
   renderAll();
   tickPrices();
   tickBalances();
