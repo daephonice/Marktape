@@ -267,45 +267,8 @@ body.hm main {
 .hm-news-item.expanded .hm-n-toggle-icon { transform: rotate(180deg); }
 
 /* Footer */
-.hm .hm-footer { width: 100%; padding-top: 24px; padding-bottom: 130px; }
+.hm .hm-footer { width: 100%; padding-top: 24px; padding-bottom: 32px; }
 .hm-footer p { margin: 0; font-size: 11px; line-height: 17px; color: var(--hm-dim); text-align: center; }
-
-/* Floating bottom bar */
-.hm-nav {
-  position: fixed;
-  left: 50%;
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  width: min(calc(100% - 48px), 340px);
-  height: 60px;
-  padding: 5px;
-  display: flex;
-  gap: 4px;
-  background: var(--hm-ctrl);
-  border-radius: 30px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  z-index: 30;
-}
-.hm-tab {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 25px;
-  color: var(--hm-dim);
-  font-size: 12px;
-  cursor: default;
-}
-.hm-tab svg { width: 22px; height: 22px; }
-.hm-tab-ic-fill { display: none; }
-.hm-tab.active .hm-tab-ic-outline { display: none; }
-.hm-tab.active .hm-tab-ic-fill { display: block; }
-.hm-tab.active { background: var(--hm-ctrl-on); color: var(--hm-text); }
-a.hm-tab { cursor: pointer; }
-body.hm a.hm-tab { color: var(--hm-dim); }
-body.hm a.hm-tab.active { color: var(--hm-text); }
 
 /* ==========================================================================
    Send flow (sheet -> address -> amount panel -> toast). Lives on body.hm.
@@ -434,12 +397,8 @@ button.hm-card-link {
 .hm-card-link h2 { flex: 1; }
 .hm-viewall { font-size: 13px; color: var(--hm-dim); }
 
-/* the floating nav's Stocks tab is a <button> */
-button.hm-tab { background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; }
-button.hm-tab.active { background: var(--hm-ctrl-on); }
-
 /* ==========================================================================
-   Horizontal pager — Home | Stocks | Swap | Lend sit side-by-side.
+   Horizontal pager — Home | Swap | Lend sit side-by-side.
    The track translates; screens never overlay. Header + nav stay put.
    ========================================================================== */
 .hm-stack {
@@ -477,7 +436,6 @@ body.hm:has(#hm-stack) {
   -webkit-overflow-scrolling: touch;
 }
 
-.stk-panel,
 .trd-slot,
 .lend-panel {
   padding-top: 16px;
@@ -486,6 +444,7 @@ body.hm:has(#hm-stack) {
 }
 
 .lend-col { padding-top: 24px; }
+.lend-title { margin: 8px 0 14px; font-size: 24px; font-weight: 700; }
 .lend-soon {
   margin: 48px 0 8px;
   text-align: center;
@@ -535,23 +494,6 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .hld-empty[hidden] { display: none; }
 .hld-empty-ic { color: var(--hm-dim); }
 .hld-empty p { margin: 0; font-size: 16px; }
-.stk-title { margin: 8px 0 14px; font-size: 24px; font-weight: 700; }
-.stk-cols,
-.hm-row.stk-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 82px 78px; gap: 10px; align-items: center; }
-.stk-cols { padding: 0 14px 6px; font-size: 13px; color: var(--hm-dim); }
-.stk-cols span:first-child { grid-column: 1 / 3; }
-.stk-cols span:nth-child(n+2) { text-align: right; }
-.stk-rows { display: flex; flex-direction: column; gap: 10px; }
-.hm-row.stk-row {
-  padding: 12px 14px;
-  background: var(--hm-card);
-  border: 1px solid var(--hm-line);
-  border-radius: 16px;
-}
-.stk-price-col { text-align: right; font-variant-numeric: tabular-nums; }
-.stk-price-col .hm-side-top { font-size: 15px; }
-.stk-mc { text-align: right; font-size: 15px; font-variant-numeric: tabular-nums; }
-.stk-rows .hm-sub { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 /* ==========================================================================
    Token page (/t/SYMBOL) — body.hm.tk
@@ -663,11 +605,10 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .swp-note:empty { display: none; }
 
 /* ==========================================================================
-   Trade (Swap) panel — homepage full-panel, like .stk-panel. Blue theme.
+   Trade (Swap) panel — homepage full-panel. Blue theme.
    Lives on body.hm. trade.js.
    ========================================================================== */
 html.trd-lock, html.trd-lock body { overflow: hidden; }
-html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 
 .trd-panel {
   padding-top: 2px;
