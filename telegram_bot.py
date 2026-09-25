@@ -150,8 +150,7 @@ def _live_board_text(rows: list[dict]) -> str:
 
 def _live_board_markup(rows: list[dict]) -> InlineKeyboardMarkup:
     """2 cols x 4 rows of PreStock symbols (same order as the price list),
-    plus SOL full-width as the CTA row. Display-only: callback_data is a
-    stub and no handler is registered for it."""
+    plus SOL full-width as the CTA row. tok:SYMBOL opens that token's menu."""
     buttons = [InlineKeyboardButton(text=r["symbol"], callback_data=f"tok:{r['symbol']}") for r in rows]
     kb: list[list[InlineKeyboardButton]] = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
     kb.append([InlineKeyboardButton(text="SOL", callback_data="tok:SOL")])
