@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 
 from sqlalchemy import select
@@ -111,13 +111,20 @@ def _live_line(row: dict) -> str:
     return f"{row['symbol']:<10} {price:>10}   {pct:>7}"
 
 
-def _live_board_text() -> str | None:
-    rows = _live_rows()
-    if not rows:
-        return None
+def _live_board_text(rows: list[dict]) -> str:
     lines = [_live_line(r) for r in rows]
     body = "\n".join(lines)
     return f"<b>Marktape — live board</b>\n<code>{body}</code>"
+
+
+def _live_board_markup(rows: list[dict]) -> InlineKeyboardMarkup:
+    """2 cols x 4 rows of PreStock symbols (same order as the price list),
+    plus SOL full-width as the CTA row. Display-only: callback_data is a
+    stub and no handler is registered for it."""
+    buttons = [InlineKeyboardButton(text=r["symbol"], callback_data=f"noop:{r['symbol']}") for r in rows]
+    kb: list[list[InlineKeyboardButton]] = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+    kb.append([InlineKeyboardButton(text="SOL", callback_data="noop:SOL")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
 # chat_id -> message_id for the one active live board per chat. In-memory
@@ -139,13 +146,15 @@ async def on_start(message: Message, command: CommandObject):
         "Marktape — mark vs tape for PreStocks.\n"
         "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n\n"
     )
-    board_text = _live_board_text()
-    if board_text:
-        text += board_text
+    rows = _live_rows()
+    if rows:
+        text += _live_board_text(rows)
+        markup = _live_board_markup(rows)
     else:
         text += "Board is warming up — try again in a moment."
+        markup = None
 
-    sent = await message.answer(text, disable_web_page_preview=True)
+    sent = await message.answer(text, reply_markup=markup, disable_web_page_preview=True)
     async with _live_board_lock:
         _live_boards[message.chat.id] = sent.message_id
 
@@ -325,9 +334,11 @@ _DEAD_MESSAGE_MARKERS = (
 
 
 async def _run_live_board_pass(bot: Bot):
-    text = _live_board_text()
-    if text is None:
+    rows = _live_rows()
+    if not rows:
         return
+    text = _live_board_text(rows)
+    markup = _live_board_markup(rows)
 
     async with _live_board_lock:
         targets = list(_live_boards.items())
@@ -335,7 +346,7 @@ async def _run_live_board_pass(bot: Bot):
     dead: list[tuple[int, int]] = []  # (chat_id, message_id) pairs to drop
     for chat_id, message_id in targets:
         try:
-            await bot.edit_message_text(text, chat_id=chat_id, message_id=message_id)
+            await bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup)
         except TelegramBadRequest as e:
             msg = str(e).lower()
             if "message is not modified" in msg:
