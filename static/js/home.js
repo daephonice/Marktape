@@ -281,7 +281,7 @@
   function metricLine(row, keys) {
     const line = h('div', 'hm-n-line');
     keys.forEach((k, i) => {
-      if (i) line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+      if (i) line.appendChild(h('span', 'hm-dim hm-n-dot', '·'));
       line.appendChild(h('span', 'hm-dim', k.label + ' '));
       line.appendChild(h('span', 'hm-stk-' + k.key));
     });
@@ -300,8 +300,8 @@
     const name = h('div', 'hm-sym');
     name.appendChild(h('span', 'hm-sym-text', sym));
     name.appendChild(icon('i-verified', 16, 'hm-verified'));
+    name.appendChild(h('span', 'hm-stk-chg'));
     head.appendChild(name);
-    head.appendChild(h('span', 'hm-stk-chg'));
     row.appendChild(head);
 
     metricLine(row, [
@@ -453,13 +453,13 @@
     line.appendChild(h('span', 'hm-n-price'));
     line.appendChild(document.createTextNode(' '));
     line.appendChild(h('span', 'hm-n-chg'));
-    line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+    line.appendChild(h('span', 'hm-dim hm-n-dot', '·'));
     line.appendChild(h('span', 'hm-dim', 'MC '));
     line.appendChild(h('span', 'hm-n-mc'));
-    line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+    line.appendChild(h('span', 'hm-dim hm-n-dot', '·'));
     line.appendChild(h('span', 'hm-dim', 'Mark '));
     line.appendChild(h('span', 'hm-n-mark'));
-    line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+    line.appendChild(h('span', 'hm-dim hm-n-dot', '·'));
     line.appendChild(h('span', 'hm-dim', 'Prem '));
     line.appendChild(h('span', 'hm-n-prem'));
     art.appendChild(line);
