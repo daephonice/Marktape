@@ -32,12 +32,12 @@ async def stocks_page():
 
 @router.get("/swap", response_class=HTMLResponse)
 async def swap_page(request: Request):
-    return templates.TemplateResponse(request, "home.html", {"open_panel": "swap"})
+    return templates.TemplateResponse(request, "swap.html", {})
 
 
 @router.get("/lend", response_class=HTMLResponse)
 async def lend_page(request: Request):
-    return templates.TemplateResponse(request, "home.html", {"open_panel": "lend"})
+    return templates.TemplateResponse(request, "lend.html", {})
 
 
 @router.get("/t/{symbol}", response_class=HTMLResponse)
