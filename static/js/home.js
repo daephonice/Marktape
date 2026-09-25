@@ -4,10 +4,9 @@
  *   /api/news             news feed
  * Values are computed here: balance = sum(amount * price) over ALL holdings;
  * Portfolio shows the top 3 by USD value. The Stocks card shows the 3 PreStocks
- * with the biggest 24h move (re-ranked every 30s); "View all" / the Stocks tab
- * open the full Stocks page on the Home|Stocks|Swap|Lend pager.
+ * with the biggest 24h move (re-ranked every 30s).
  * Every row links to its token page (/t/SYMBOL). Send opens the send flow
- * (send.js). Swap lives on the pager. Lend is a Coming Soon stub.
+ * (send.js). Swap/Lend live on the Home|Swap|Lend pager. Lend is a Coming Soon stub.
  */
 (function () {
   const PRICE_MS = 1000;
@@ -32,14 +31,6 @@
     notice: $('hm-lock-notice'),
     stockRows: $('hm-stock-rows'),
     stockEmpty: $('hm-stock-empty'),
-    stocksOpen: $('hm-stocks-open'),
-    panel: $('stk-panel'),
-    panelRows: $('stk-rows'),
-    panelEmpty: $('stk-empty'),
-    tabHome: document.querySelector('[data-tab="home"]'),
-    tabStocks: document.querySelector('[data-tab="stocks"]'),
-    tabSwap: document.querySelector('[data-tab="swap"]'),
-    tabLend: document.querySelector('[data-tab="lend"]'),
     lendBtn: $('hm-lend-btn'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
@@ -323,26 +314,19 @@
     syncList(els.stockRows, top, (s) => s, buildStockRow, updateStockRow);
     els.stockEmpty.hidden = top.length > 0;
     els.stockEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
-    if (panelOpen) renderPanel();
   }
 
-  // ---- Pager (Home | Stocks | Swap | Lend) ---------------------------------
-  const SCREEN_ORDER = ['home', 'stocks', 'swap', 'lend'];
-  const SCREEN_PATH = { home: '/', stocks: '/stocks', swap: '/swap', lend: '/lend' };
+  // ---- Pager (Home | Swap | Lend) ---------------------------------
+  const SCREEN_ORDER = ['home', 'swap', 'lend'];
+  const SCREEN_PATH = { home: '/', swap: '/swap', lend: '/lend' };
   let activeScreen = 'home';
 
   function pathOf(name) { return SCREEN_PATH[name] || '/'; }
 
   function screenFromPath(pathname) {
-    if (pathname === '/stocks') return 'stocks';
     if (pathname === '/swap') return 'swap';
     if (pathname === '/lend') return 'lend';
     return 'home';
-  }
-
-  function setTabs(name) {
-    const map = { home: els.tabHome, stocks: els.tabStocks, swap: els.tabSwap, lend: els.tabLend };
-    Object.keys(map).forEach((k) => { if (map[k]) map[k].classList.toggle('active', k === name); });
   }
 
   function goToScreen(name, instant, hist) {
@@ -357,20 +341,12 @@
       els.track.offsetHeight;
       els.track.classList.remove('hm-no-anim');
     }
-    setTabs(name);
     const pages = els.track.querySelectorAll('.hm-screen');
     pages.forEach((p, k) => {
       const on = k === i;
       p.toggleAttribute('inert', !on);
       p.style.pointerEvents = on ? 'auto' : 'none';
     });
-    if (name === 'stocks') {
-      panelOpen = true;
-      renderPanel();
-      els.panel.scrollTop = 0;
-    } else {
-      panelOpen = false;
-    }
     if (name === 'swap') ensureTrade();
     if (hist !== false && pathOf(name) !== location.pathname) {
       history.replaceState({ screen: name }, '', pathOf(name));
@@ -389,52 +365,6 @@
     });
   }
 
-  // ---- Stocks panel (full list, sorted by market cap) -----------------------
-  let panelOpen = false;
-
-  function buildPanelRow(sym) {
-    const row = rowShell(sym, { badge: true, size: 40 });
-    row.classList.add('stk-row');
-    const side = row.querySelector('.hm-row-side');
-    side.className = 'stk-price-col';
-    side.replaceChildren(h('div', 'hm-side-top stk-price'), h('div', 'hm-side-bot stk-chg'));
-    row.appendChild(h('div', 'hm-side-top stk-mc'));
-    return row;
-  }
-
-  function updatePanelRow(node, sym) {
-    const p = state.prices[sym];
-    node.querySelector('.hm-sub').textContent = meta(sym).name || sym;
-    node.querySelector('.stk-price').textContent = p ? fmtPrice(p.price) : '—';
-    const chg = node.querySelector('.stk-chg');
-    chg.className = 'hm-side-bot stk-chg';
-    setPct(chg, p ? p.change24h : null);
-    node.querySelector('.stk-mc').textContent = p && p.mc ? fmtCompact(p.mc) : '—';
-  }
-
-  function renderPanel() {
-    const syms = stockSyms().sort((a, b) => mcOf(b) - mcOf(a) || a.localeCompare(b));
-    syncList(els.panelRows, syms, (s) => s, buildPanelRow, updatePanelRow);
-    els.panelEmpty.hidden = syms.length > 0;
-    els.panelEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
-  }
-
-  function openPanel() { goToScreen('stocks'); }
-  function closePanel() { goToScreen('home'); }
-
-  els.stocksOpen.addEventListener('click', (e) => { e.preventDefault(); goToScreen('stocks'); });
-  document.querySelectorAll('.hm-tab[data-tab]').forEach((tab) => {
-    tab.addEventListener('click', (e) => {
-      e.preventDefault();
-      const name = tab.getAttribute('data-tab');
-      if (name === activeScreen) {
-        const page = els.track && els.track.querySelector('[data-screen="' + name + '"]');
-        if (page) page.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      goToScreen(name);
-    });
-  });
   window.addEventListener('popstate', () => {
     goToScreen(screenFromPath(location.pathname), false, false);
   });

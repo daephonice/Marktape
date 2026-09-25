@@ -1,4 +1,4 @@
-/* Trade (Swap) panel — homepage full-panel, like #stk-panel, blue theme.
+/* Trade (Swap) panel — homepage full-panel, blue theme.
  * Sell card / swap-direction button / Buy card (read-only) / rate+gasless+
  * warning row / CTA. No in-site keyboard — the native mobile keyboard drives
  * the amount input. Debounced Jupiter Ultra order fetch ("Getting Price...")
@@ -6,9 +6,9 @@
  * closes and MarktapeSend.toast() shows the shared blue toast.
  *
  * Host (home.js) calls MarktapeTrade.open({ getCtx, onDone }) to open the
- * panel and MarktapeTrade.setOpen(bool) to drive it from the nav tab / URL
- * hash, mirroring the #stk-panel pattern. getCtx() -> { address, holdings,
- * prices, assets } (live state, same shape as send.js's getCtx).
+ * panel and MarktapeTrade.setOpen(bool) to drive it from the pager screen /
+ * URL. getCtx() -> { address, holdings, prices, assets } (live state, same
+ * shape as send.js's getCtx).
  *
  * Non-custodial: /api/swap/order builds the Ultra order server-side (the API
  * key never reaches the browser), the wallet signs, /api/swap/execute
