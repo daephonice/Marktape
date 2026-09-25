@@ -207,6 +207,7 @@
       if (e.key !== 'Escape' || !S) return;
       if (!R.infoModal.hidden) closeInfo();
       else if (!R.tok.hidden) closeTokens();
+      else if (!S.swapping) close();
     });
     window.addEventListener('marktape:wallet', (e) => {
       if (S && e.detail.address !== S.address) close();
@@ -563,9 +564,11 @@
     const c = host.getCtx();
     if (!c.address || !Object.keys(c.prices).length) return;
     build();
-    const sell = pickDefaultSell(c);
+    let sell = host.sell && c.prices[host.sell] ? host.sell : pickDefaultSell(c);
+    let buy = host.buy && c.prices[host.buy] ? host.buy : pickDefaultBuy(c, sell);
+    if (sell === buy) buy = pickDefaultBuy(c, sell);
     S = {
-      host, address: c.address, sell, buy: pickDefaultBuy(c, sell),
+      host, address: c.address, sell, buy,
       sellRaw: '', order: null, quoting: false, quoteTimer: null, quoteReq: 0,
       note: '', swapping: false,
     };
