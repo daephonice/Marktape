@@ -98,7 +98,14 @@ async def _metis_order(input_mint, output_mint, amount_raw, taker, client) -> di
         raise ValueError(f"no route: {quote.get('error') or quote}")
     s = await client.post(
         METIS_SWAP_URL,
-        json={"quoteResponse": quote, "userPublicKey": taker, "wrapAndUnwrapSol": True},
+        json={
+            "quoteResponse": quote,
+            "userPublicKey": taker,
+            "wrapAndUnwrapSol": True,
+            "dynamicComputeUnitLimit": True,
+            "dynamicSlippage": True,
+            "prioritizationFeeLamports": "auto",
+        },
         headers=_headers(),
     )
     s.raise_for_status()
