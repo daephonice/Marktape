@@ -5,9 +5,9 @@
  * Values are computed here: balance = sum(amount * price) over ALL holdings;
  * Portfolio shows the top 3 by USD value. The Stocks card shows the 3 PreStocks
  * with the biggest 24h move (re-ranked every 30s); "View all" / the Stocks tab
- * open the full Stocks panel (/stocks in the URL so Back returns to it).
+ * open the full Stocks page on the Home|Stocks|Swap|Lend pager.
  * Every row links to its token page (/t/SYMBOL). Send opens the send flow
- * (send.js); Swap / Lend are inert for now.
+ * (send.js). Swap lives on the pager. Lend is a Coming Soon stub.
  */
 (function () {
   const PRICE_MS = 1000;
@@ -21,6 +21,7 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     stack: $('hm-stack'),
+    track: $('hm-track'),
     dashboard: $('hm-dashboard'),
     total: $('hm-total'),
     change: $('hm-change'),
@@ -38,6 +39,8 @@
     tabHome: document.querySelector('[data-tab="home"]'),
     tabStocks: document.querySelector('[data-tab="stocks"]'),
     tabSwap: document.querySelector('[data-tab="swap"]'),
+    tabLend: document.querySelector('[data-tab="lend"]'),
+    lendBtn: $('hm-lend-btn'),
     holdRows: $('hm-hold-rows'),
     holdEmpty: $('hm-hold-empty'),
     holdOpen: $('hm-hold-open'),
@@ -209,9 +212,12 @@
     if (connected) els.sendBtn.removeAttribute('aria-disabled');
     else els.sendBtn.setAttribute('aria-disabled', 'true');
     if (els.swapBtn) {
-      els.swapBtn.classList.toggle('live', connected);
-      if (connected) els.swapBtn.removeAttribute('aria-disabled');
-      else els.swapBtn.setAttribute('aria-disabled', 'true');
+      els.swapBtn.classList.toggle('live', true);
+      els.swapBtn.removeAttribute('aria-disabled');
+    }
+    if (els.lendBtn) {
+      els.lendBtn.classList.toggle('live', true);
+      els.lendBtn.removeAttribute('aria-disabled');
     }
 
     if (!connected) {
@@ -320,66 +326,60 @@
     if (panelOpen) renderPanel();
   }
 
-  // ---- Screen stack (Home / Stocks / Swap slide as one push-transition) -----
-  const SCREEN_ORDER = ['home', 'stocks', 'swap'];
+  // ---- Pager (Home | Stocks | Swap | Lend) ---------------------------------
+  const SCREEN_ORDER = ['home', 'stocks', 'swap', 'lend'];
+  const SCREEN_PATH = { home: '/', stocks: '/stocks', swap: '/swap', lend: '/lend' };
   let activeScreen = 'home';
-  const ANIM_MS = 320;
 
-  function screenEl(name) {
-    if (name === 'home') return els.dashboard;
-    if (name === 'stocks') return els.panel;
-    if (name === 'swap') return window.MarktapeTrade ? window.MarktapeTrade.panelEl() : null;
-    return null;
+  function pathOf(name) { return SCREEN_PATH[name] || '/'; }
+
+  function screenFromPath(pathname) {
+    if (pathname === '/stocks') return 'stocks';
+    if (pathname === '/swap') return 'swap';
+    if (pathname === '/lend') return 'lend';
+    return 'home';
   }
 
-  // Shows `name`, hides the rest, sliding `name` in from the direction
-  // implied by SCREEN_ORDER (right if moving to a later tab, left if
-  // earlier) while the current screen slides fully out the other way.
-  // `instant` skips the animation (first paint / no prior screen).
-  function goToScreen(name, instant) {
-    const from = activeScreen;
-    const fromEl = screenEl(from);
-    const toEl = screenEl(name);
+  function setTabs(name) {
+    const map = { home: els.tabHome, stocks: els.tabStocks, swap: els.tabSwap, lend: els.tabLend };
+    Object.keys(map).forEach((k) => { if (map[k]) map[k].classList.toggle('active', k === name); });
+  }
+
+  function goToScreen(name, instant, hist) {
+    if (SCREEN_ORDER.indexOf(name) < 0) name = 'home';
+    const i = SCREEN_ORDER.indexOf(name);
+    const prev = activeScreen;
     activeScreen = name;
-    if (!toEl || fromEl === toEl) return;
-
-    if (instant || !fromEl) {
-      if (fromEl && fromEl !== toEl) fromEl.hidden = true;
-      toEl.hidden = false;
-      toEl.classList.remove('hm-off-left', 'hm-off-right');
-      toEl.style.transform = '';
-      return;
+    if (!els.track) return;
+    if (instant) els.track.classList.add('hm-no-anim');
+    els.track.style.transform = 'translate3d(' + (-i * 100) + '%,0,0)';
+    if (instant) {
+      els.track.offsetHeight;
+      els.track.classList.remove('hm-no-anim');
     }
-
-    const forward = SCREEN_ORDER.indexOf(name) > SCREEN_ORDER.indexOf(from);
-    const stack = els.stack;
-    stack.classList.add('hm-animating');
-
-    toEl.hidden = false;
-    toEl.classList.add(forward ? 'hm-off-right' : 'hm-off-left');
-    fromEl.classList.remove('hm-off-left', 'hm-off-right');
-
-    // Force layout so the starting transform is applied before we
-    // transition both screens to their resting positions.
-    // eslint-disable-next-line no-unused-expressions
-    toEl.offsetHeight;
-
-    requestAnimationFrame(() => {
-      toEl.classList.remove('hm-off-left', 'hm-off-right');
-      fromEl.classList.add(forward ? 'hm-off-left' : 'hm-off-right');
+    setTabs(name);
+    const pages = els.track.querySelectorAll('.hm-screen');
+    pages.forEach((p, k) => {
+      const on = k === i;
+      p.toggleAttribute('inert', !on);
+      p.style.pointerEvents = on ? 'auto' : 'none';
     });
-
-    setTimeout(() => {
-      if (activeScreen !== name) return; // superseded by a later transition
-      fromEl.hidden = true;
-      fromEl.classList.remove('hm-off-left', 'hm-off-right');
-      stack.classList.remove('hm-animating');
-    }, ANIM_MS + 30);
+    if (name === 'stocks') {
+      panelOpen = true;
+      renderPanel();
+      els.panel.scrollTop = 0;
+    } else {
+      panelOpen = false;
+    }
+    if (name === 'swap') ensureTrade();
+    if (hist !== false && pathOf(name) !== location.pathname) {
+      history.replaceState({ screen: name }, '', pathOf(name));
+    }
+    if (prev !== name && name !== 'home') window.scrollTo(0, 0);
   }
 
   // ---- Stocks panel (full list, sorted by market cap) -----------------------
   let panelOpen = false;
-  let panelPushed = false;
 
   function buildPanelRow(sym) {
     const row = rowShell(sym, { badge: true, size: 40 });
@@ -408,71 +408,29 @@
     els.panelEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
   }
 
-  function syncDashboard() {
-    // Kept as a light sync point for callers that only changed swap state
-    // (e.g. trade.js's own open/close) without going through goToScreen.
-    const swapOpen = !!(window.MarktapeTrade && window.MarktapeTrade.isOpen());
-    if (swapOpen && activeScreen !== 'swap') goToScreen('swap');
-    else if (!swapOpen && !panelOpen && activeScreen === 'swap') goToScreen('home');
-  }
+  function openPanel() { goToScreen('stocks'); }
+  function closePanel() { goToScreen('home'); }
 
-  function setPanel(open) {
-    panelOpen = open;
-    els.panel.classList.toggle('open', open);
-    els.panel.setAttribute('aria-hidden', open ? 'false' : 'true');
-    if (els.tabHome) els.tabHome.classList.toggle('active', !open);
-    if (els.tabStocks) els.tabStocks.classList.toggle('active', open);
-    goToScreen(open ? 'stocks' : 'home');
-    if (open) {
-      renderPanel();
-      els.panel.scrollTop = 0;
-      window.scrollTo(0, 0);
-    }
-  }
-
-  function openPanel() {
-    if (panelOpen) return;
-    if (location.pathname !== '/stocks') {
-      history.pushState(null, '', '/stocks');
-      panelPushed = true;
-    }
-    setPanel(true);
-  }
-
-  function closePanel() {
-    if (!panelOpen) return;
-    if (panelPushed) {
-      panelPushed = false;
-      history.back(); // popstate closes it
-    } else {
-      history.replaceState(null, '', '/');
-      setPanel(false);
-    }
-  }
-
-  els.stocksOpen.addEventListener('click', (e) => { e.preventDefault(); openPanel(); });
-  if (els.tabStocks) {
-    els.tabStocks.addEventListener('click', (e) => {
+  els.stocksOpen.addEventListener('click', (e) => { e.preventDefault(); goToScreen('stocks'); });
+  document.querySelectorAll('.hm-tab[data-tab]').forEach((tab) => {
+    tab.addEventListener('click', (e) => {
       e.preventDefault();
-      panelOpen ? closePanel() : openPanel();
+      const name = tab.getAttribute('data-tab');
+      if (name === activeScreen) {
+        const page = els.track && els.track.querySelector('[data-screen="' + name + '"]');
+        if (page) page.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      goToScreen(name);
     });
-  }
-  if (els.tabHome) {
-    els.tabHome.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (panelOpen) closePanel();
-      else if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) history.back();
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
-      if (location.pathname !== '/') history.replaceState(null, '', '/');
-    });
-  }
+  });
   window.addEventListener('popstate', () => {
-    const open = location.pathname === '/stocks';
-    if (!open) panelPushed = false;
-    setPanel(open);
+    goToScreen(screenFromPath(location.pathname), false, false);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && panelOpen && !document.documentElement.classList.contains('snd-lock') && !document.documentElement.classList.contains('trd-lock')) closePanel();
+    if (e.key === 'Escape' && activeScreen !== 'home' && !document.documentElement.classList.contains('snd-lock') && !document.documentElement.classList.contains('trd-tok-lock')) {
+      goToScreen('home');
+    }
   });
 
   function renderHoldings() {
@@ -697,45 +655,25 @@
   });
 
   // ---- Trade (Swap) ---------------------------------------------------------
-  window.addEventListener('marktape:trade-panel', syncDashboard);
-  function setSwapTabActive(open) {
-    if (els.tabSwap) els.tabSwap.classList.toggle('active', open);
-    if (open && els.tabHome) els.tabHome.classList.remove('active');
-    else if (!panelOpen && els.tabHome) els.tabHome.classList.add('active');
-  }
-
-  function openTrade() {
-    if (!state.address || !window.MarktapeTrade) return;
-    if (location.pathname !== '/swap') history.pushState(null, '', '/swap');
-    setSwapTabActive(true);
-    window.MarktapeTrade.open({
+  function tradeHost() {
+    return {
       getCtx: () => ({ address: state.address, holdings: state.holdings || {}, prices: state.prices, assets: state.assets }),
       onDone: () => {
         tickBalances();
         setTimeout(tickBalances, 2500);
       },
-    });
+    };
   }
+
+  function ensureTrade() {
+    if (!window.MarktapeTrade) return;
+    window.MarktapeTrade.mount(document.getElementById('trd-slot'));
+    window.MarktapeTrade.open(tradeHost());
+  }
+
+  function openTrade() { goToScreen('swap'); }
   if (els.swapBtn) els.swapBtn.addEventListener('click', openTrade);
-  if (els.tabSwap) {
-    els.tabSwap.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) history.back();
-      else openTrade();
-    });
-  }
-  window.addEventListener('popstate', () => {
-    if (location.pathname !== '/swap' && window.MarktapeTrade && window.MarktapeTrade.isOpen()) window.MarktapeTrade.close();
-    if (location.pathname !== '/swap') setSwapTabActive(false);
-  });
-  // trade.js closes itself on a successful swap (not via history.back()) —
-  // clean up the /swap URL + tab state so Back doesn't land on a re-opened panel.
-  setInterval(() => {
-    if (location.pathname === '/swap' && window.MarktapeTrade && !window.MarktapeTrade.isOpen()) {
-      history.replaceState(null, '', '/');
-      setSwapTabActive(false);
-    }
-  }, 400);
+  if (els.lendBtn) els.lendBtn.addEventListener('click', () => goToScreen('lend'));
 
   // ---- Wallet -------------------------------------------------------------
   function setAddress(next) {
@@ -759,13 +697,10 @@
 
   // ---- Boot ---------------------------------------------------------------
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
-  const bootPanel = window.__MKT_OPEN_PANEL__ || (location.pathname === '/stocks' ? 'stocks' : location.pathname === '/swap' ? 'swap' : '');
-  if (bootPanel === 'stocks') { activeScreen = 'stocks'; setPanel(true); goToScreen('stocks', true); }
-  else if (bootPanel === 'swap' && state.address) { activeScreen = 'swap'; openTrade(); goToScreen('swap', true); }
-  else if (bootPanel === 'swap') history.replaceState(null, '', '/');
-  syncDashboard();
+  if (window.MarktapeTrade) window.MarktapeTrade.mount(document.getElementById('trd-slot'));
+  const bootPanel = window.__MKT_OPEN_PANEL__ || screenFromPath(location.pathname);
+  goToScreen(bootPanel || 'home', true, false);
   renderAll();
-  setSwapTabActive(!!(window.MarktapeTrade && window.MarktapeTrade.isOpen()));
   tickPrices();
   tickBalances();
   loadNews();

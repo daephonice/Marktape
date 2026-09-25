@@ -89,10 +89,9 @@
   function build() {
     if (root) return;
     root = document.createElement('section');
-    root.className = 'trd-panel hm-screen';
-    root.hidden = true;
+    root.className = 'trd-panel';
     root.setAttribute('aria-label', 'Swap');
-    root.setAttribute('aria-hidden', 'true');
+    root.setAttribute('aria-hidden', 'false');
     root.innerHTML = `
       <div class="hm-col trd-col">
         <div class="trd-card" data-side="sell">
@@ -159,12 +158,8 @@
           </dl>
         </div>
       </div>`;
-    document.body.appendChild(root);
-    // Placed inside the home page's screen stack (#hm-stack), as a sibling
-    // of #hm-dashboard / #stk-panel, so it slides with them as one set of
-    // screens instead of being a body-level overlay.
-    const stack = document.getElementById('hm-stack');
-    if (stack) stack.appendChild(root);
+    const slot = document.getElementById('trd-slot');
+    (slot || document.body).appendChild(root);
 
     const q = (s) => root.querySelector(s);
     Object.assign(R, {
@@ -209,8 +204,20 @@
       else if (!R.tok.hidden) closeTokens();
     });
     window.addEventListener('marktape:wallet', (e) => {
-      if (S && e.detail.address !== S.address) close();
+      if (!S) return;
+      S.address = e.detail.address || null;
+      if (!S.address) {
+        S.sellRaw = '';
+        resetQuote();
+      }
+      render();
     });
+  }
+
+  function mount(slot) {
+    build();
+    if (slot && root.parentNode !== slot) slot.appendChild(root);
+    return root;
   }
 
   // ---- Token selector ------------------------------------------------------
@@ -447,6 +454,7 @@
     const amt = parseFloat(S.sellRaw) || 0;
     const c = S.host.getCtx();
     const bal = c.holdings[S.sell] || 0;
+    if (!S.address) { b.textContent = 'Connect wallet'; b.disabled = true; return; }
     if (!(amt > 0)) { b.textContent = 'Enter Amount'; b.disabled = true; return; }
     if (amt > bal * (1 + 1e-9)) { b.textContent = 'Insufficient Balance'; b.disabled = true; return; }
     if (S.quoting) { b.textContent = 'Getting Price....'; b.disabled = true; return; }
@@ -560,41 +568,34 @@
   }
 
   function open(host) {
-    const c = host.getCtx();
-    if (!c.address || !Object.keys(c.prices).length) return;
     build();
+    const c = host.getCtx();
     const sell = pickDefaultSell(c);
     S = {
-      host, address: c.address, sell, buy: pickDefaultBuy(c, sell),
+      host, address: c.address || null, sell, buy: pickDefaultBuy(c, sell),
       sellRaw: '', order: null, quoting: false, quoteTimer: null, quoteReq: 0,
       note: '', swapping: false,
     };
     root.setAttribute('aria-hidden', 'false');
-    document.documentElement.classList.add('trd-lock');
     root.classList.add('open');
-    // #hm-stack's router (home.js) owns root.hidden / the slide transition;
-    // it listens for this event and animates root in.
-    window.dispatchEvent(new CustomEvent('marktape:trade-panel', { detail: { open: true } }));
     render();
   }
 
   function close() {
     if (!S) return;
     clearTimeout(S.quoteTimer);
-    S = null;
-    R.inputSell.blur();
-    R.tok.hidden = true;
-    R.infoModal.hidden = true;
+    S.sellRaw = '';
+    resetQuote();
+    S.swapping = false;
+    if (R.inputSell) R.inputSell.blur();
+    if (R.tok) R.tok.hidden = true;
+    if (R.infoModal) R.infoModal.hidden = true;
     document.documentElement.classList.remove('trd-tok-lock');
-    root.classList.remove('open');
-    root.setAttribute('aria-hidden', 'true');
-    document.documentElement.classList.remove('trd-lock');
-    // root.hidden is set by the router once its exit animation finishes.
-    window.dispatchEvent(new CustomEvent('marktape:trade-panel', { detail: { open: false } }));
+    render();
   }
 
   function isOpen() { return !!S; }
   function panelEl() { build(); return root; }
 
-  window.MarktapeTrade = { open, close, isOpen, panelEl };
+  window.MarktapeTrade = { open, close, isOpen, panelEl, mount };
 })();
