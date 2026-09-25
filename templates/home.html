@@ -29,7 +29,8 @@
 </svg>
 
 <div class="hm-stack" id="hm-stack">
-<div class="hm-col hm-screen" id="hm-dashboard"{% if open_panel %} hidden{% endif %}>
+<div class="hm-track" id="hm-track">
+<div class="hm-col hm-screen" id="hm-dashboard" data-screen="home">
   <section class="hm-balance">
     <div class="hm-total" id="hm-total">$0.00</div>
     <div class="hm-change flat" id="hm-change">
@@ -53,7 +54,7 @@
       <span class="hm-action-label">Swap</span>
     </div>
     <div class="hm-action">
-      <button class="hm-action-btn" type="button" aria-disabled="true" aria-label="Lend">
+      <button class="hm-action-btn" id="hm-lend-btn" type="button" aria-disabled="true" aria-label="Lend">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg>
       </button>
       <span class="hm-action-label">Lend</span>
@@ -86,9 +87,13 @@
     <div id="hm-news-list"></div>
     <p class="hm-news-empty" id="hm-news-empty" hidden>No news available yet</p>
   </section>
+
+  <footer class="hm-footer">
+    <p>Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. Marktape does not custody funds.</p>
+  </footer>
 </div>
 
-<section class="stk-panel hm-screen" id="stk-panel" aria-label="Stocks" aria-hidden="true">
+<section class="stk-panel hm-screen" id="stk-panel" data-screen="stocks" aria-label="Stocks">
   <div class="hm-col">
     <h2 class="stk-title">Stocks</h2>
     <div class="stk-cols"><span>Token</span><span>Price/Δ%</span><span>MC</span></div>
@@ -96,6 +101,17 @@
     <p class="hm-empty" id="stk-empty">Loading…</p>
   </div>
 </section>
+
+<section class="trd-slot hm-screen" id="trd-slot" data-screen="swap" aria-label="Swap"></section>
+
+<section class="lend-panel hm-screen" id="lend-panel" data-screen="lend" aria-label="Lend">
+  <div class="hm-col lend-col">
+    <h2 class="stk-title">Lend</h2>
+    <p class="lend-soon">Coming soon</p>
+    <p class="lend-soon-sub">Lending will land here. Layout and backend can drop in without touching the other tabs.</p>
+  </div>
+</section>
+</div>
 </div>
 
 <div class="hld-root" id="hld-root" hidden>
@@ -119,9 +135,6 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="hm-col hm-footer">
-  <p>Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. Marktape does not custody funds.</p>
-</footer>
 {% set nav_active = open_panel or 'home' %}
 {% include "_bottom_nav.html" %}
 <script>window.__MKT_OPEN_PANEL__ = {{ (open_panel or '')|tojson }};</script>
