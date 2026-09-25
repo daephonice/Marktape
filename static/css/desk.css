@@ -266,6 +266,48 @@ a.hm-action-btn { cursor: pointer; }
   cursor: pointer;
 }
 .hm-news-item.expanded .hm-n-toggle-icon { transform: rotate(180deg); }
+.hm-n-toggle.open .hm-n-toggle-icon { transform: rotate(180deg); }
+.hm-n-toggle-icon { transition: transform 0.2s ease; }
+
+.hm-stocks { margin-top: 28px; }
+.hm-stk-cols,
+.hm-stk-row {
+  display: grid;
+  grid-template-columns: minmax(102px, 1.4fr) repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+.hm-stk-cols {
+  padding: 4px 10px 0;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--hm-dim);
+}
+.hm-stk-cols span:not(:first-child) { text-align: right; }
+.hm-stk-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.hm-stk-row {
+  padding: 10px;
+  background: var(--hm-card);
+  border-radius: 16px;
+}
+.hm-stk-token { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hm-stk-id { min-width: 0; }
+.hm-stk-id .hm-sym { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.hm-stk-id .hm-sym-text { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-stk-chg { margin-top: 2px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.hm-stk-cell {
+  text-align: right;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hm-stocks .hm-n-toggle { margin-top: 10px; color: var(--accent); }
+.hm-stocks .hm-empty { padding: 20px 0; }
 
 /* Footer */
 .hm .hm-footer { width: 100%; padding-top: 24px; padding-bottom: 32px; }
@@ -521,8 +563,9 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .tk-pill { padding: 2px 7px; border-radius: 7px; font-size: 14px; background: rgba(251, 113, 133, 0.12); }
 .tk-pill.pos { background: rgba(74, 222, 128, 0.12); }
 .tk-pill.flat { background: rgba(157, 158, 162, 0.12); }
-.tk-stat { text-align: right; font-size: 13px; color: var(--hm-dim); flex-shrink: 0; }
-.tk-stat b { display: block; margin-top: 3px; font-size: 14px; font-weight: 500; color: var(--hm-text); font-variant-numeric: tabular-nums; }
+.tk-stats { display: flex; gap: 12px; flex-shrink: 0; }
+.tk-stat { text-align: right; font-size: 12px; color: var(--hm-dim); flex-shrink: 0; }
+.tk-stat b { display: block; margin-top: 3px; font-size: 13px; font-weight: 500; color: var(--hm-text); font-variant-numeric: tabular-nums; }
 
 .tk-ranges { display: flex; gap: 4px; padding: 16px 14px 5px; }
 .tk-range { padding: 5px 11px; border: 0; border-radius: 7px; background: none; color: var(--hm-dim); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
