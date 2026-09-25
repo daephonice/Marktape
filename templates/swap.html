@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Swap — Marktape{% endblock %}
+{% block body_class %}hm tk{% endblock %}
+
+{% block header %}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+<header class="tk-header">
+  <div class="hm-col tk-header-inner">
+    <a class="tk-back" href="/" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </a>
+    <span class="tk-id" style="margin-left:8px">
+      <span class="tk-sym" style="font-size:1.05rem;font-weight:600">Swap</span>
+    </span>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="tk-wrap" id="swap-page">
+  <div id="trd-slot"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/send.js?v={{ static_v('js/send.js') }}"></script>
+<script src="/static/js/trade.js?v={{ static_v('js/trade.js') }}"></script>
+<script>
+(function () {
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var sndLock = document.documentElement.classList.contains('snd-lock');
+      var trdLock = document.documentElement.classList.contains('trd-tok-lock');
+      if (!sndLock && !trdLock) window.location.href = '/';
+    }
+  });
+})();
+</script>
+{% endblock %}

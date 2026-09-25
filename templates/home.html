@@ -29,8 +29,7 @@
 </svg>
 
 <div class="hm-stack" id="hm-stack">
-<div class="hm-track" id="hm-track">
-<div class="hm-col hm-screen" id="hm-dashboard" data-screen="home">
+<div class="hm-col hm-screen" id="hm-dashboard">
   <section class="hm-balance">
     <div class="hm-total" id="hm-total">$0.00</div>
     <div class="hm-change flat" id="hm-change">
@@ -48,15 +47,15 @@
       <span class="hm-action-label">Send</span>
     </div>
     <div class="hm-action">
-      <button class="hm-action-btn" id="hm-swap-btn" type="button" aria-disabled="true" aria-label="Swap">
+      <a class="hm-action-btn" id="hm-swap-btn" href="/swap" aria-label="Swap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
-      </button>
+      </a>
       <span class="hm-action-label">Swap</span>
     </div>
     <div class="hm-action">
-      <button class="hm-action-btn" id="hm-lend-btn" type="button" aria-disabled="true" aria-label="Lend">
+      <a class="hm-action-btn" id="hm-lend-btn" href="/lend" aria-label="Lend">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg>
-      </button>
+      </a>
       <span class="hm-action-label">Lend</span>
     </div>
   </div>
@@ -90,17 +89,6 @@
     <p>Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. Marktape does not custody funds.</p>
   </footer>
 </div>
-
-<section class="trd-slot hm-screen" id="trd-slot" data-screen="swap" aria-label="Swap"></section>
-
-<section class="lend-panel hm-screen" id="lend-panel" data-screen="lend" aria-label="Lend">
-  <div class="hm-col lend-col">
-    <h2 class="lend-title">Lend</h2>
-    <p class="lend-soon">Coming soon</p>
-    <p class="lend-soon-sub">Lending will land here. Layout and backend can drop in without touching the other tabs.</p>
-  </div>
-</section>
-</div>
 </div>
 
 <div class="hld-root" id="hld-root" hidden>
@@ -123,12 +111,7 @@
 </div>
 {% endblock %}
 
-{% block footer %}
-<script>window.__MKT_OPEN_PANEL__ = {{ (open_panel or '')|tojson }};</script>
-{% endblock %}
-
 {% block scripts %}
 <script src="/static/js/send.js?v={{ static_v('js/send.js') }}"></script>
-<script src="/static/js/trade.js?v={{ static_v('js/trade.js') }}"></script>
 <script src="/static/js/home.js?v={{ static_v('js/home.js') }}"></script>
 {% endblock %}
