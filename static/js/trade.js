@@ -26,7 +26,10 @@
     warn: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
     close: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     external: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>',
+    back: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19 5 12l7-7"/><path d="M19 12H5"/></svg>',
   };
+
+  const SOL_RESERVE = 0.003;
 
   const decimalsOf = (sym) => DECIMALS[sym] || 6;
 
@@ -101,7 +104,7 @@
           </div>
           <div class="trd-card-main">
             <button type="button" class="trd-pill" data-pill="sell" aria-label="Select token to sell"><span class="trd-pill-logo"></span><span class="trd-pill-sym"></span>${ICON.chevron}</button>
-            <input class="trd-amount" data-input="sell" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="0" aria-label="Amount to sell">
+            <div class="trd-amount" data-input="sell" aria-label="Amount to sell">0</div>
           </div>
           <div class="trd-card-sub" data-sub="sell"></div>
         </div>
@@ -131,6 +134,24 @@
 
         <p class="trd-note" data-note role="alert"></p>
         <button type="button" class="trd-cta" data-cta disabled>Enter Amount</button>
+        <div class="trd-keys" data-keys>
+          <button type="button" class="trd-key trd-key-act" data-key="max">MAX</button>
+          <button type="button" class="trd-key" data-key="1">1</button>
+          <button type="button" class="trd-key" data-key="2">2</button>
+          <button type="button" class="trd-key" data-key="3">3</button>
+          <button type="button" class="trd-key trd-key-act" data-key="75">75%</button>
+          <button type="button" class="trd-key" data-key="4">4</button>
+          <button type="button" class="trd-key" data-key="5">5</button>
+          <button type="button" class="trd-key" data-key="6">6</button>
+          <button type="button" class="trd-key trd-key-act" data-key="50">50%</button>
+          <button type="button" class="trd-key" data-key="7">7</button>
+          <button type="button" class="trd-key" data-key="8">8</button>
+          <button type="button" class="trd-key" data-key="9">9</button>
+          <button type="button" class="trd-key trd-key-act" data-key="clear">CLEAR</button>
+          <button type="button" class="trd-key" data-key=".">.</button>
+          <button type="button" class="trd-key" data-key="0">0</button>
+          <button type="button" class="trd-key" data-key="back" aria-label="Delete">${ICON.back}</button>
+        </div>
       </div>
 
       <div class="trd-tok" data-tok hidden>
@@ -170,7 +191,7 @@
       subSell: q('[data-sub="sell"]'), subBuy: q('[data-sub="buy"]'),
       dir: q('.trd-dir'), infoRow: q('[data-info-row]'), rate: q('[data-rate]'),
       gasless: q('[data-gasless]'), warnChip: q('[data-warn]'),
-      note: q('[data-note]'), cta: q('[data-cta]'),
+      note: q('[data-note]'), cta: q('[data-cta]'), keys: q('[data-keys]'),
       tok: q('[data-tok]'), tokBack: q('.trd-tok-back'), tokList: q('[data-tok-list]'),
       infoModal: q('[data-info-modal]'), infoBack: q('.trd-info-back'), infoClose: q('.trd-info-close'),
       feeWarn: q('[data-fee-warn]'), feeTitle: q('[data-fee-title]'), feeSub: q('[data-fee-sub]'),
@@ -185,12 +206,9 @@
       const row = e.target.closest('[data-sym]');
       if (row) selectToken(row.dataset.sym);
     });
-    R.inputSell.addEventListener('input', () => {
-      if (!S) return;
-      S.sellRaw = sanitize(R.inputSell.value, decimalsOf(S.sell));
-      R.inputSell.value = S.sellRaw;
-      scheduleQuote();
-      render();
+    R.keys.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-key]');
+      if (btn) pressKey(btn.dataset.key);
     });
     R.dir.addEventListener('click', reverse);
     R.infoRow.addEventListener('click', openInfo);
@@ -213,10 +231,8 @@
     window.addEventListener('marktape:wallet', (e) => {
       if (!S) return;
       S.address = e.detail.address || null;
-      if (!S.address) {
-        S.sellRaw = '';
-        resetQuote();
-      }
+      if (!S.address) resetQuote();
+      else scheduleQuote();
       render();
     });
   }
@@ -317,6 +333,38 @@
     return s.replace(/0+$/, '').replace(/\.$/, '');
   }
 
+  function sellBalance() {
+    const c = S && S.host ? S.host.getCtx() : { holdings: {} };
+    return (c.holdings && c.holdings[S.sell]) || 0;
+  }
+
+  function maxSell() {
+    let bal = sellBalance();
+    if (S.sell === 'SOL') bal = Math.max(0, bal - SOL_RESERVE);
+    return bal;
+  }
+
+  function setSellRaw(raw) {
+    if (!S || S.swapping) return;
+    S.sellRaw = sanitize(String(raw || ''), decimalsOf(S.sell));
+    scheduleQuote();
+    render();
+  }
+
+  function pressKey(key) {
+    if (!S || S.swapping) return;
+    if (key === 'clear') return setSellRaw('');
+    if (key === 'back') return setSellRaw((S.sellRaw || '').slice(0, -1));
+    if (key === 'max') return setSellRaw(trimNum(maxSell(), decimalsOf(S.sell)));
+    if (key === '75') return setSellRaw(trimNum(sellBalance() * 0.75, decimalsOf(S.sell)));
+    if (key === '50') return setSellRaw(trimNum(sellBalance() * 0.50, decimalsOf(S.sell)));
+    if (key === '.') {
+      if ((S.sellRaw || '').includes('.')) return;
+      return setSellRaw((S.sellRaw || '0') + '.');
+    }
+    setSellRaw((S.sellRaw || '') + key);
+  }
+
   // ---- Quote -----------------------------------------------------------------
   function resetQuote() {
     if (!S) return;
@@ -349,17 +397,17 @@
     const amt = parseFloat(sess.sellRaw);
     if (!inMint || !outMint || !(amt > 0)) { sess.quoting = false; render(); return; }
     try {
-      const order = await postJSON('/api/swap/order', {
-        inputMint: inMint, outputMint: outMint, uiAmount: amt, taker: sess.address,
-      });
+      const body = { inputMint: inMint, outputMint: outMint, uiAmount: amt };
+      if (sess.address) body.taker = sess.address;
+      const order = await postJSON('/api/swap/order', body);
       if (S !== sess || sess.quoteReq !== reqId) return;
       sess.quoting = false;
-      if (!order.transaction) {
-        sess.order = null;
-        sess.note = order.deepLink ? 'No route found for this pair' : 'No route found';
-      } else {
+      if (order.uiOutAmount) {
         sess.order = order;
         sess.note = '';
+      } else {
+        sess.order = null;
+        sess.note = order.deepLink ? 'No route found for this pair' : 'No route found';
       }
       render();
     } catch (err) {
@@ -391,12 +439,14 @@
       R.pillBuy.dataset.sym = S.buy;
     }
 
-    if (R.inputSell.value !== S.sellRaw) R.inputSell.value = S.sellRaw;
+    const shown = S.sellRaw || '0';
+    if (R.inputSell.textContent !== shown) R.inputSell.textContent = shown;
+    R.inputSell.classList.toggle('is-empty', !S.sellRaw);
 
     const sellBal = c.holdings[S.sell] || 0;
     const buyBal = c.holdings[S.buy] || 0;
-    R.balSell.querySelector('.trd-bal-sell') && (R.balSell.querySelector('.trd-bal-sell').textContent = fmtAmount(sellBal));
-    R.balBuy.querySelector('.trd-bal-buy') && (R.balBuy.querySelector('.trd-bal-buy').textContent = fmtAmount(buyBal));
+    R.balSell.textContent = S.address ? fmtAmount(sellBal) : '';
+    R.balBuy.textContent = S.address ? fmtAmount(buyBal) : '';
 
     const sellPrice = (c.prices[S.sell] || {}).price || 0;
     const sellAmt = parseFloat(S.sellRaw) || 0;
@@ -426,7 +476,7 @@
     R.subBuy.textContent = subBuy;
     R.subBuy.className = 'trd-card-sub' + (subBuy.includes('(') ? ' neg' : '');
 
-    const hasOrder = !!(S.order && S.order.uiOutAmount);
+    const hasOrder = !!(S.order && S.order.uiOutAmount); // quote-only is fine before connect
     R.infoRow.hidden = !hasOrder;
     if (hasOrder) {
       R.rate.textContent = S.order.rate ? `1 ${S.sell} \u2248 ${fmtAmount(S.order.rate)} ${S.buy}` : '';
@@ -516,7 +566,8 @@
 
   // ---- Swap ------------------------------------------------------------------
   async function doSwap() {
-    if (!S || S.swapping || !S.order || !S.order.transaction) return;
+    if (!S || S.swapping || !S.order || !S.order.uiOutAmount) return;
+    if (!S.order.transaction) { scheduleQuote(); return; }
     const sess = S;
     sess.swapping = true;
     sess.note = '';

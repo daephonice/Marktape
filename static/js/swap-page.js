@@ -103,6 +103,13 @@
     tickBalances();
   });
 
+  document.documentElement.classList.add('trd-lock');
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.trd-tok-list, .trd-tok-sheet, .trd-info-sheet')) return;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+
   tickPrices();
   tickBalances();
   setInterval(tickPrices, PRICE_MS);
