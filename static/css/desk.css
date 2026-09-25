@@ -136,8 +136,9 @@ body.hm main {
 /* Header */
 .hm-header { position: sticky; top: 0; z-index: 20; flex: 0 0 auto; background: var(--hm-bg); padding-top: env(safe-area-inset-top, 0px); }
 .hm-header-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; }
-.hm .mkt-wordmark { font-size: 24px; }
-.hm .mkt-connect-btn { height: 40px; padding: 0 16px; border-radius: 10px; font-size: 15px; }
+.hm .mkt-brand-mark svg { width: 27.6px; height: 27.6px; }
+.hm .mkt-wordmark { font-size: 22.08px; }
+.hm .mkt-connect-btn { height: 36.8px; padding: 0 14.72px; border-radius: 9px; font-size: 13.8px; }
 .hm .mkt-connect-btn.connected {
   background: var(--hm-ctrl);
   color: var(--hm-text);
@@ -457,15 +458,23 @@ button.hm-tab.active { background: var(--hm-ctrl-on); }
   transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .hm-track.hm-no-anim { transition: none; }
+body.hm:has(#hm-stack) {
+  overflow: hidden;
+  height: 100dvh;
+}
 .hm-screen {
   flex: 0 0 100%;
   width: 100%;
   height: 100%;
   overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow-y: hidden;
+  overscroll-behavior: none;
   background: var(--hm-bg);
   box-sizing: border-box;
+}
+.hm-screen.hm-can-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stk-panel,
