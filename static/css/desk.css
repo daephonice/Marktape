@@ -397,6 +397,7 @@ html.snd-lock, html.snd-lock body { overflow: hidden; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .snd-toast.show { transform: translate(-50%, 0); }
+.snd-toast.err { background: #e5484d; }
 
 /* ==========================================================================
    Home: Stocks card + Stocks panel
