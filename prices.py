@@ -107,6 +107,8 @@ async def _refresh_stocks(client: httpx.AsyncClient) -> None:
         supply = r.get("supply")
         url = r.get("externalUrl")
         desc = r.get("description")
+        mark = r.get("markPrice")
+        mark_f = float(mark) if isinstance(mark, (int, float)) and mark > 0 else None
         _stocks[r["symbol"].upper()] = {
             "symbol": r["symbol"],
             "mint": r["mint"],
@@ -116,6 +118,8 @@ async def _refresh_stocks(client: httpx.AsyncClient) -> None:
             "url": url if isinstance(url, str) and url.startswith(("https://", "http://")) else None,
             "supply": float(supply) if isinstance(supply, (int, float)) else None,
             "price": float(price),
+            "mark": mark_f,
+            "premium": prestocks.premium(float(price), mark_f),
         }
     _touch()
 
@@ -219,15 +223,26 @@ def _pct(price: float, open_price: float | None) -> float | None:
 
 
 def get_prices() -> dict | None:
-    """{"updatedAt", "prices": {SYMBOL: {price, change24h, mc?}}}; None until
-    the first refresh lands."""
+    """{"updatedAt", "prices": {SYMBOL: {price, change24h, mc?, mark, premium}}}.
+    mark/premium are PreStocks-only; SOL/USDT/USDC get null. None until the
+    first refresh lands."""
     if not _stocks and not _tokens:
         return None
     out: dict[str, dict] = {}
     for sym, t in _tokens.items():
-        out[sym] = {"price": t["price"], "change24h": _pct(t["price"], t["open"])}
+        out[sym] = {
+            "price": t["price"],
+            "change24h": _pct(t["price"], t["open"]),
+            "mark": None,
+            "premium": None,
+        }
     for sym, s in _stocks.items():
-        entry = {"price": s["price"], "change24h": _pct(s["price"], _stock_open.get(s["symbol"]))}
+        entry = {
+            "price": s["price"],
+            "change24h": _pct(s["price"], _stock_open.get(s["symbol"])),
+            "mark": s.get("mark"),
+            "premium": s.get("premium"),
+        }
         if s["supply"]:
             entry["mc"] = s["supply"] * s["price"]
         out[sym] = entry
