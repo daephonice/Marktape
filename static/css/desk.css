@@ -650,6 +650,10 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .tk-readmore { margin-top: 7px; padding: 0; border: 0; background: none; color: var(--accent); font-family: inherit; font-size: 14px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .tk-about.expanded .tk-readmore svg { transform: rotate(180deg); }
 .tk-link { margin-top: 14px; padding: 11px 14px; border-radius: 11px; background: var(--hm-ctrl); color: var(--hm-muted); display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 9px; font-size: 14px; word-break: break-all; }
+.tk-tg-link { color: var(--hm-text); }
+.hm-stocks-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 6px; }
+.hm-stocks-head .hm-news-title { margin: 0; }
+.hm-stocks-tg { margin-top: 0; flex-shrink: 0; }
 .tk-legal { margin: 0; padding: 25px 14px calc(120px + env(safe-area-inset-bottom, 0px)); font-size: 10px; line-height: 15px; color: var(--hm-dim); text-align: center; }
 
 .tk-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 22px 0 calc(12px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, var(--hm-bg) 62%, rgba(7, 9, 14, 0)); pointer-events: none; }
