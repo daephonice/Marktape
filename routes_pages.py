@@ -2,7 +2,7 @@ import os
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 import prices
 
@@ -25,9 +25,9 @@ async def home_page(request: Request):
     return templates.TemplateResponse(request, "home.html", {})
 
 
-@router.get("/stocks", response_class=HTMLResponse)
-async def stocks_page(request: Request):
-    return templates.TemplateResponse(request, "home.html", {"open_panel": "stocks"})
+@router.get("/stocks")
+async def stocks_page():
+    return RedirectResponse(url="/", status_code=302)
 
 
 @router.get("/swap", response_class=HTMLResponse)
