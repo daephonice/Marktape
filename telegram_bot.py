@@ -18,7 +18,7 @@ Bot never touches wallets or signs anything — swap only happens on the site.
 import os
 import asyncio
 import logging
-
+from datetime import datetime, timezone
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -478,6 +478,129 @@ async def on_symbol_shortcut(message: Message):
 
 
 # ---------------------------------------------------------------------------
+# Hourly per-symbol digest — each of the 9 names gets its own minute
+# (index * 7: :00, :07, ... :56). In-memory only: keeps the price from the
+# symbol's previous slot (~60m ago) to compute the 1h move. No DB.
+# ---------------------------------------------------------------------------
+
+DIGEST_SLOT_MINUTES = 7
+
+_last_slot_price: dict[str, float] = {}  # symbol -> price at its last digest slot
+_last_digest_minute: int = -1
+
+
+def _digest_symbol_order() -> list[str]:
+    """Same order as the start board (mc desc), SOL last."""
+    rows = _live_rows()
+    order = [r["symbol"].upper() for r in rows]
+    order.append("SOL")
+    return order
+
+
+def _fmt_mc(mc: float | None) -> str | None:
+    if mc is None:
+        return None
+    if mc >= 1_000_000_000:
+        return f"${mc / 1_000_000_000:.2f}B"
+    if mc >= 1_000_000:
+        return f"${mc / 1_000_000:.2f}M"
+    return f"${mc:,.0f}"
+
+
+def _digest_text(symbol: str) -> str | None:
+    live = prices.get_prices()
+    entry = (live or {}).get("prices", {}).get(symbol)
+    if not entry or entry.get("price") is None:
+        return None
+    price = entry["price"]
+
+    prev = _last_slot_price.get(symbol)
+    if prev and prev > 0:
+        change1h = (price / prev - 1) * 100
+    else:
+        change1h = None
+    if change1h is None or change1h == 0:
+        return None  # no prior price, or genuinely flat — don't invent a move
+
+    sign = "+" if change1h > 0 else ""
+    lines = [f"<b>{symbol}</b>  ${price:.2f}  ({sign}{change1h:.1f}% / 1h)"]
+    if entry.get("mark") is not None:
+        lines.append(f"Mark ${entry['mark']:.2f}")
+    mc = _fmt_mc(entry.get("mc"))
+    if mc:
+        lines.append(f"Market cap {mc}")
+    lines.append(f"{symbol} just moved {sign}{change1h:.1f}% in the last hr")
+    return "\n".join(lines)
+
+
+async def _send_digest_for_symbol(bot: Bot, symbol: str) -> None:
+    text = _digest_text(symbol)
+    if not text:
+        return
+
+    db = SessionLocal()
+    try:
+        watchers = db.execute(select(Watch).where(Watch.symbol == symbol)).scalars().all()
+    finally:
+        db.close()
+    if not watchers:
+        return
+
+    dead_ids: list[int] = []
+    for w in watchers:
+        try:
+            await bot.send_message(w.chat_id, text, disable_web_page_preview=True)
+        except (TelegramForbiddenError, TelegramBadRequest):
+            dead_ids.append(w.id)
+        except Exception:
+            log.warning("telegram_bot: digest send failed for chat %s", w.chat_id, exc_info=True)
+
+    if dead_ids:
+        db = SessionLocal()
+        try:
+            rows = db.execute(select(Watch).where(Watch.id.in_(dead_ids))).scalars().all()
+            for w in rows:
+                db.delete(w)
+            db.commit()
+        finally:
+            db.close()
+
+
+async def _run_digest_pass(bot: Bot):
+    global _last_digest_minute
+    now = datetime.now(timezone.utc)
+    minute = now.minute
+    if minute == _last_digest_minute:
+        return
+    _last_digest_minute = minute
+
+    if minute % DIGEST_SLOT_MINUTES != 0:
+        return
+    slot_index = minute // DIGEST_SLOT_MINUTES  # 0..8
+
+    order = _digest_symbol_order()
+    if slot_index >= len(order):
+        return
+    symbol = order[slot_index]
+
+    await _send_digest_for_symbol(bot, symbol)
+
+    live = prices.get_prices()
+    entry = (live or {}).get("prices", {}).get(symbol)
+    if entry and entry.get("price") is not None:
+        _last_slot_price[symbol] = entry["price"]
+
+
+async def _digest_loop(bot: Bot):
+    while True:
+        try:
+            await _run_digest_pass(bot)
+        except Exception:
+            log.exception("telegram_bot: digest loop iteration failed")
+        await asyncio.sleep(15)
+
+
+# ---------------------------------------------------------------------------
 # Live board loop — edits each chat's /start message every 5s.
 # ---------------------------------------------------------------------------
 
@@ -544,6 +667,7 @@ _bot: Bot | None = None
 _dp: Dispatcher | None = None
 _task: asyncio.Task | None = None
 _live_board_task: asyncio.Task | None = None
+_digest_task: asyncio.Task | None = None
 
 
 async def _polling_loop():
@@ -552,9 +676,11 @@ async def _polling_loop():
     _dp = Dispatcher()
     _dp.include_router(router)
 
-    global _live_board_task
+    global _live_board_task, _digest_task
     if _live_board_task is None or _live_board_task.done():
         _live_board_task = asyncio.create_task(_live_board_loop(_bot))
+    if _digest_task is None or _digest_task.done():
+        _digest_task = asyncio.create_task(_digest_loop(_bot))
 
     while True:
         try:
