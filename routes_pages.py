@@ -35,6 +35,11 @@ async def swap_page(request: Request):
     return templates.TemplateResponse(request, "home.html", {"open_panel": "swap"})
 
 
+@router.get("/lend", response_class=HTMLResponse)
+async def lend_page(request: Request):
+    return templates.TemplateResponse(request, "home.html", {"open_panel": "lend"})
+
+
 @router.get("/t/{symbol}", response_class=HTMLResponse)
 async def token_page(request: Request, symbol: str):
     asset = prices.get_asset(symbol)
