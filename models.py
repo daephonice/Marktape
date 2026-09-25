@@ -27,16 +27,13 @@ class PriceSnapshot(Base):
 
 
 class Watch(Base):
-    """Telegram chat watching a symbol for a premium threshold alert."""
+    """Telegram chat watching a symbol (hourly digest, see Part 5)."""
     __tablename__ = "watches"
 
     id = Column(Integer, primary_key=True)
     chat_id = Column(BigInteger, nullable=False, index=True)
     symbol = Column(String, nullable=False, index=True)
-    threshold = Column(Float, nullable=False, default=0.10)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    last_alert_at = Column(DateTime(timezone=True), nullable=True)
-    last_premium = Column(Float, nullable=True)
 
     __table_args__ = (
         Index("ix_watches_chat_symbol", "chat_id", "symbol", unique=True),

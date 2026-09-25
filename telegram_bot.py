@@ -6,20 +6,19 @@ Commands (spec §2.2):
   /start [SYMBOL]   3-line pitch + site link. With a payload, show that card.
   /board            Compact list of every symbol: SYMBOL  premium%  tape vs mark
   /t SYMBOL | /symbol   Full card + site link + Jupiter link
-  /watch SYMBOL     Persist chat_id+symbol, default threshold ±10%
+  /watch SYMBOL     Persist chat_id+symbol (max 5 per chat)
   /unwatch SYMBOL   Remove
   /watches          List this chat's watches
 
-Alert loop (every 60s): for each watch, if abs(premium) crosses the
-threshold (or crosses back), send one message. Dedupe: max one alert per
-symbol per chat per 30 min unless premium flips sign.
+Watches currently just mean "included in the hourly digest" (not sent yet).
+No premium-threshold alert loop.
 
 Bot never touches wallets or signs anything — swap only happens on the site.
 """
 import os
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -43,8 +42,6 @@ JUPITER_DEEP_BASE = "https://jup.ag/swap"
 
 router = Router()
 
-DEFAULT_THRESHOLD = 0.10
-ALERT_DEDUPE_MINUTES = 30
 MAX_WATCHES_PER_CHAT = 5
 
 
@@ -195,7 +192,7 @@ def _add_watch(chat_id: int, symbol: str) -> str:
         count = db.execute(select(Watch.id).where(Watch.chat_id == chat_id)).scalars().all()
         if len(count) >= MAX_WATCHES_PER_CHAT:
             return "cap"
-        db.add(Watch(chat_id=chat_id, symbol=symbol_u, threshold=DEFAULT_THRESHOLD))
+        db.add(Watch(chat_id=chat_id, symbol=symbol_u))
         db.commit()
         return "added"
     finally:
@@ -461,7 +458,7 @@ async def on_watches(message: Message):
     if not rows:
         await message.answer("No watches yet. /watch SPACEX to start.")
         return
-    lines = [f"{w.symbol}  ±{w.threshold*100:.0f}%" for w in rows]
+    lines = [w.symbol for w in rows]
     await message.answer("\n".join(lines))
 
 
@@ -478,61 +475,6 @@ async def on_symbol_shortcut(message: Message):
     jup_link = f"{JUPITER_DEEP_BASE}/{prestocks.USDC_MINT}-{row['mint']}"
     reply = _card_text(row) + f"\nTrade: {WEB_PUBLIC_URL}/t/{row['symbol']}#swap\nJupiter: {jup_link}"
     await message.answer(reply, disable_web_page_preview=True)
-
-
-# ---------------------------------------------------------------------------
-# Alert loop
-# ---------------------------------------------------------------------------
-
-async def _run_alert_pass(bot: Bot):
-    snap = prestocks.get_cached_snapshot()
-    tokens_by_symbol = {t["symbol"].upper(): t for t in snap.get("tokens", [])}
-    if not tokens_by_symbol:
-        return
-
-    db = SessionLocal()
-    try:
-        watches = db.execute(select(Watch)).scalars().all()
-        now = datetime.now(timezone.utc)
-        for w in watches:
-            row = tokens_by_symbol.get(w.symbol)
-            if not row or row["premium"] is None:
-                continue
-            premium = row["premium"]
-            crossed = abs(premium) >= w.threshold
-            was_crossed = w.last_premium is not None and abs(w.last_premium) >= w.threshold
-            sign_flip = (
-                w.last_premium is not None
-                and premium * w.last_premium < 0
-                and abs(premium) >= w.threshold
-            )
-
-            should_alert = crossed and (not was_crossed or sign_flip)
-            if should_alert and w.last_alert_at:
-                elapsed = now - w.last_alert_at
-                if elapsed < timedelta(minutes=ALERT_DEDUPE_MINUTES) and not sign_flip:
-                    should_alert = False
-
-            if should_alert:
-                try:
-                    await bot.send_message(w.chat_id, _card_text(row), disable_web_page_preview=True)
-                    w.last_alert_at = now
-                except Exception:
-                    log.warning("telegram_bot: failed to alert chat %s", w.chat_id, exc_info=True)
-
-            w.last_premium = premium
-        db.commit()
-    finally:
-        db.close()
-
-
-async def _alert_loop(bot: Bot):
-    while True:
-        try:
-            await _run_alert_pass(bot)
-        except Exception:
-            log.exception("telegram_bot: alert loop iteration failed")
-        await asyncio.sleep(60)
 
 
 # ---------------------------------------------------------------------------
@@ -601,7 +543,6 @@ async def _live_board_loop(bot: Bot):
 _bot: Bot | None = None
 _dp: Dispatcher | None = None
 _task: asyncio.Task | None = None
-_alert_task: asyncio.Task | None = None
 _live_board_task: asyncio.Task | None = None
 
 
@@ -611,9 +552,7 @@ async def _polling_loop():
     _dp = Dispatcher()
     _dp.include_router(router)
 
-    global _alert_task, _live_board_task
-    if _alert_task is None or _alert_task.done():
-        _alert_task = asyncio.create_task(_alert_loop(_bot))
+    global _live_board_task
     if _live_board_task is None or _live_board_task.done():
         _live_board_task = asyncio.create_task(_live_board_loop(_bot))
 
