@@ -183,8 +183,9 @@ body.hm main {
   padding: 0;
 }
 .hm-action-btn svg { width: 24px; height: 24px; }
+a.hm-action-btn { cursor: pointer; }
 .hm-action-label { font-size: 13px; color: var(--hm-muted); }
-.hm-actions.locked { opacity: 0.5; }
+.hm-actions.locked #hm-send-btn { opacity: 0.5; }
 .hm-lock-notice { margin: 14px 0 0; text-align: center; font-size: 12px; color: var(--hm-dim); }
 
 /* Cards */
@@ -397,51 +398,18 @@ button.hm-card-link {
 .hm-card-link h2 { flex: 1; }
 .hm-viewall { font-size: 13px; color: var(--hm-dim); }
 
-/* ==========================================================================
-   Horizontal pager — Home | Swap | Lend sit side-by-side.
-   The track translates; screens never overlay. Header + nav stay put.
-   ========================================================================== */
 .hm-stack {
   flex: 1 1 auto;
-  min-height: 0;
   width: 100%;
-  overflow: hidden;
-  position: relative;
-}
-.hm-track {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
-  width: 100%;
-  will-change: transform;
-  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
-}
-.hm-track.hm-no-anim { transition: none; }
-body.hm:has(#hm-stack) {
-  overflow: hidden;
-  height: 100dvh;
-}
-.hm-screen {
-  flex: 0 0 100%;
-  width: 100%;
-  height: 100%;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  overscroll-behavior: none;
-  background: var(--hm-bg);
-  box-sizing: border-box;
-}
-.hm-screen.hm-can-scroll {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.trd-slot,
-.lend-panel {
+#trd-slot {
   padding-top: 16px;
-  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
+#swap-page .stk-title { display: none; }
+.tk-header-inner .mkt-connect-btn { margin-left: auto; }
 
 .lend-col { padding-top: 24px; }
 .lend-title { margin: 8px 0 14px; font-size: 24px; font-weight: 700; }
