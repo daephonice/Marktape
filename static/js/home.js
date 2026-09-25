@@ -376,19 +376,12 @@
       history.replaceState({ screen: name }, '', pathOf(name));
     }
     if (prev !== name && name !== 'home') window.scrollTo(0, 0);
-    document.body.classList.toggle('hm-ptr', name === 'home');
-    document.body.classList.toggle('hm-no-ptr', name !== 'home');
     requestAnimationFrame(syncScreenOverflow);
   }
 
   function syncScreenOverflow() {
     if (!els.track) return;
-    const ptr = document.body.classList.contains('hm-ptr');
     els.track.querySelectorAll('.hm-screen').forEach((p) => {
-      if (ptr && p.dataset.screen === 'home') {
-        p.classList.remove('hm-can-scroll');
-        return;
-      }
       p.classList.remove('hm-can-scroll');
       const need = p.scrollHeight > p.clientHeight + 2;
       p.classList.toggle('hm-can-scroll', need);
