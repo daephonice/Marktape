@@ -73,14 +73,17 @@ async def get_prices(mint_ids: list[str], client: httpx.AsyncClient | None = Non
 
 
 async def _ultra_order(input_mint, output_mint, amount_raw, taker, client) -> dict:
+    params = {"inputMint": input_mint, "outputMint": output_mint, "amount": amount_raw}
+    if taker:
+        params["taker"] = taker
     resp = await client.get(
         ULTRA_ORDER_URL,
-        params={"inputMint": input_mint, "outputMint": output_mint, "amount": amount_raw, "taker": taker},
+        params=params,
         headers=_headers(),
     )
     resp.raise_for_status()
     order = resp.json()
-    if "transaction" not in order:
+    if "transaction" not in order and not (order.get("outAmount") and not taker):
         raise ValueError(f"no route: {order.get('errorMessage') or order}")
     order["_provider"] = "ultra"
     return order
@@ -96,6 +99,16 @@ async def _metis_order(input_mint, output_mint, amount_raw, taker, client) -> di
     quote = q.json()
     if not quote.get("routePlan"):
         raise ValueError(f"no route: {quote.get('error') or quote}")
+    if not taker:
+        return {
+            "_provider": "metis",
+            "outAmount": quote.get("outAmount"),
+            "otherAmountThreshold": quote.get("otherAmountThreshold"),
+            "priceImpactPct": quote.get("priceImpactPct"),
+            "routePlan": quote.get("routePlan"),
+            "gasless": False,
+            "feeBps": 0,
+        }
     s = await client.post(
         METIS_SWAP_URL,
         json={"quoteResponse": quote, "userPublicKey": taker, "wrapAndUnwrapSol": True},

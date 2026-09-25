@@ -94,7 +94,7 @@ class SwapOrderRequest(BaseModel):
     inputMint: str
     outputMint: str
     uiAmount: float
-    taker: str
+    taker: str | None = None
 
 
 async def _leg_info(mint: str) -> dict:
@@ -129,7 +129,6 @@ async def swap_order(body: SwapOrderRequest):
 
     if "transaction" not in order:
         order["deepLink"] = jupiter.jup_deep_link(body.inputMint, body.outputMint)
-        return order
 
     # UI-friendly fields for the panel + Price Info modal. Raw provider
     # fields are left in place too, in case the frontend ever wants them.
