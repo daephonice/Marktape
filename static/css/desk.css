@@ -116,7 +116,16 @@ body.hm {
 }
 body.hm a { color: inherit; }
 body.hm { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
+body.hm main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .hm .hm-col { max-width: 480px; margin: 0 auto; padding: 0 16px; }
 .hm .pos { color: var(--hm-pos); }
 .hm .neg { color: var(--hm-neg); }
@@ -125,7 +134,7 @@ body.hm main { max-width: none; width: 100%; margin: 0; padding: 0; flex: 1; }
 .hm [hidden] { display: none !important; }
 
 /* Header */
-.hm-header { position: sticky; top: 0; z-index: 20; background: var(--hm-bg); padding-top: env(safe-area-inset-top, 0px); }
+.hm-header { position: sticky; top: 0; z-index: 20; flex: 0 0 auto; background: var(--hm-bg); padding-top: env(safe-area-inset-top, 0px); }
 .hm-header-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; }
 .hm .mkt-wordmark { font-size: 24px; }
 .hm .mkt-connect-btn { height: 40px; padding: 0 16px; border-radius: 10px; font-size: 15px; }
@@ -429,37 +438,57 @@ button.hm-tab { background: none; border: 0; padding: 0; font-family: inherit; c
 button.hm-tab.active { background: var(--hm-ctrl-on); }
 
 /* ==========================================================================
-   Screen stack — Home / Stocks / Swap slide as one push-transition set,
-   like a single-stack navigator: only one screen visible at a time, the
-   outgoing one slides fully off as the incoming one slides fully in.
-   Order matches the bottom nav: home(0) < stocks(1) < swap(2). JS sets
-   data-active on #hm-stack and toggles .hm-enter-left/.hm-enter-right on
-   the target screen; this file only defines the geometry + easing.
+   Horizontal pager — Home | Stocks | Swap | Lend sit side-by-side.
+   The track translates; screens never overlay. Header + nav stay put.
    ========================================================================== */
 .hm-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
   position: relative;
-  overflow-x: clip;
-  width: 100%;
 }
+.hm-track {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  will-change: transform;
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.hm-track.hm-no-anim { transition: none; }
 .hm-screen {
+  flex: 0 0 100%;
   width: 100%;
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s cubic-bezier(0.32, 0.72, 0, 1);
-  transform: translateX(0);
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--hm-bg);
+  box-sizing: border-box;
 }
-/* Mid-transition only: both screens are briefly position:absolute so they
-   overlap for the animation; JS removes this class once it settles back
-   to a single static (non-absolute) screen for normal document flow. */
-.hm-stack.hm-animating { display: block; }
-.hm-stack.hm-animating .hm-screen { position: absolute; top: 0; left: 0; }
-.hm-stack.hm-animating .hm-screen[hidden] { display: block !important; }
-.hm-screen.hm-off-right { transform: translateX(100%); }
-.hm-screen.hm-off-left { transform: translateX(-100%); }
 
-.stk-panel {
+.stk-panel,
+.trd-slot,
+.lend-panel {
   padding-top: 16px;
   padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
-  width: 100%;
+}
+
+.lend-col { padding-top: 24px; }
+.lend-soon {
+  margin: 48px 0 8px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+}
+.lend-soon-sub {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--hm-muted);
 }
 
 /* ==========================================================================
@@ -632,14 +661,13 @@ html.trd-lock, html.trd-lock body { overflow: hidden; }
 html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 
 .trd-panel {
-  padding-top: 18px;
-  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  padding-top: 2px;
   box-sizing: border-box;
   font-family: 'Geist', -apple-system, sans-serif;
   color: var(--hm-text, #fafafa);
   width: 100%;
+  min-height: 100%;
 }
-.trd-panel[hidden] { display: none; }
 .trd-panel button, .trd-panel input { font-family: inherit; }
 
 .trd-col { display: flex; flex-direction: column; gap: 8px; }
