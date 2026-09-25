@@ -45,12 +45,31 @@ router = Router()
 
 DEFAULT_THRESHOLD = 0.10
 ALERT_DEDUPE_MINUTES = 30
+MAX_WATCHES_PER_CHAT = 5
 
 
 def _row_for(symbol: str) -> dict | None:
     snap = prestocks.get_cached_snapshot()
     symbol_u = symbol.upper().lstrip("/")
     return next((t for t in snap.get("tokens", []) if t["symbol"].upper() == symbol_u), None)
+
+
+def _resolve_symbol(text: str) -> str | None:
+    """Name or ticker -> canonical symbol among the 8 PreStocks + SOL, or None."""
+    text_u = text.strip().upper().lstrip("/")
+    if not text_u:
+        return None
+    if text_u == "SOL":
+        return "SOL"
+    row = _row_for(text_u)
+    if row:
+        return row["symbol"].upper()
+    # fall back to matching by name
+    snap = prestocks.get_cached_snapshot()
+    for t in snap.get("tokens", []):
+        if (t.get("name") or "").strip().upper() == text_u:
+            return t["symbol"].upper()
+    return None
 
 
 def _card_text(row: dict) -> str:
@@ -163,8 +182,47 @@ def _is_watching(chat_id: int, symbol: str) -> bool:
         db.close()
 
 
-def _token_menu_text(symbol: str) -> str | None:
+def _add_watch(chat_id: int, symbol: str) -> str:
+    """Returns 'added' | 'exists' | 'cap'."""
     symbol_u = symbol.upper()
+    db = SessionLocal()
+    try:
+        existing = db.execute(
+            select(Watch).where(Watch.chat_id == chat_id, Watch.symbol == symbol_u)
+        ).scalar_one_or_none()
+        if existing:
+            return "exists"
+        count = db.execute(select(Watch.id).where(Watch.chat_id == chat_id)).scalars().all()
+        if len(count) >= MAX_WATCHES_PER_CHAT:
+            return "cap"
+        db.add(Watch(chat_id=chat_id, symbol=symbol_u, threshold=DEFAULT_THRESHOLD))
+        db.commit()
+        return "added"
+    finally:
+        db.close()
+
+
+def _remove_watch(chat_id: int, symbol: str) -> bool:
+    symbol_u = symbol.upper()
+    db = SessionLocal()
+    try:
+        existing = db.execute(
+            select(Watch).where(Watch.chat_id == chat_id, Watch.symbol == symbol_u)
+        ).scalar_one_or_none()
+        if not existing:
+            return False
+        db.delete(existing)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def _token_menu_text(symbol: str, chat_id: int | None = None) -> str | None:
+    symbol_u = symbol.upper()
+    watching = _is_watching(chat_id, symbol_u) if chat_id is not None else False
+    prefix = "Watching 👁️ " if watching else ""
+
     if symbol_u == "SOL":
         live = prices.get_prices()
         sol = (live or {}).get("prices", {}).get("SOL")
@@ -172,7 +230,7 @@ def _token_menu_text(symbol: str) -> str | None:
         if not sol or not asset:
             return None
         price = f"${sol['price']:.2f}" if sol.get("price") is not None else "—"
-        lines = [f"<b>SOL</b> — {asset['name']}", f"Tape {price}"]
+        lines = [f"<b>{prefix}SOL</b> — {asset['name']}", f"Tape {price}"]
         if asset.get("description"):
             lines.append(f"\n{asset['description']}")
         return "\n".join(lines)
@@ -183,7 +241,7 @@ def _token_menu_text(symbol: str) -> str | None:
         return None
     pct = prestocks.format_premium(row["premium"])
     lines = [
-        f"<b>{row['symbol']}</b> — {row.get('name', '')}",
+        f"<b>{prefix}{row['symbol']}</b> — {row.get('name', '')}",
         f"Tape ${row['tokenPrice']:.2f} · Mark ${row['markPrice']:.2f} · {pct}",
     ]
     if asset.get("description"):
@@ -200,7 +258,7 @@ def _token_menu_text(symbol: str) -> str | None:
 
 def _token_menu_markup(chat_id: int, symbol: str) -> InlineKeyboardMarkup:
     symbol_u = symbol.upper()
-    watch_label = "Watching 👁️" if _is_watching(chat_id, symbol_u) else "Watch 👁️"
+    watch_label = "Watching" if _is_watching(chat_id, symbol_u) else "Watch 👁️"
     kb = [[
         InlineKeyboardButton(text=watch_label, callback_data=f"watch:{symbol_u}"),
         InlineKeyboardButton(text="Unwatch ❌", callback_data=f"unwatch:{symbol_u}"),
@@ -214,11 +272,11 @@ def _token_menu_markup(chat_id: int, symbol: str) -> InlineKeyboardMarkup:
 @router.callback_query(lambda c: c.data and c.data.startswith("tok:"))
 async def on_token_tap(callback: CallbackQuery):
     symbol = callback.data.split(":", 1)[1]
-    text = _token_menu_text(symbol)
+    chat_id = callback.message.chat.id
+    text = _token_menu_text(symbol, chat_id)
     if not text:
         await callback.answer()
         return
-    chat_id = callback.message.chat.id
     markup = _token_menu_markup(chat_id, symbol)
     try:
         await callback.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
@@ -255,19 +313,48 @@ async def on_back(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(lambda c: c.data and (c.data.startswith("watch:") or c.data.startswith("unwatch:")))
-async def on_watch_toggle(callback: CallbackQuery):
-    await callback.answer("Not implemented yet")
+async def _refresh_token_menu(callback: CallbackQuery, symbol: str) -> None:
+    chat_id = callback.message.chat.id
+    text = _token_menu_text(symbol, chat_id)
+    if not text:
+        return
+    markup = _token_menu_markup(chat_id, symbol)
+    try:
+        await callback.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
+
+
+@router.callback_query(lambda c: c.data and c.data.startswith("watch:"))
+async def on_watch_cb(callback: CallbackQuery):
+    symbol = callback.data.split(":", 1)[1]
+    chat_id = callback.message.chat.id
+    result = _add_watch(chat_id, symbol)
+    if result == "cap":
+        await callback.answer(f"Watch limit reached ({MAX_WATCHES_PER_CHAT}). Unwatch one first.", show_alert=True)
+        return
+    await _refresh_token_menu(callback, symbol)
+    await callback.answer("Watching" if result == "added" else "Already watching")
+
+
+@router.callback_query(lambda c: c.data and c.data.startswith("unwatch:"))
+async def on_unwatch_cb(callback: CallbackQuery):
+    symbol = callback.data.split(":", 1)[1]
+    chat_id = callback.message.chat.id
+    removed = _remove_watch(chat_id, symbol)
+    await _refresh_token_menu(callback, symbol)
+    await callback.answer("Unwatched" if removed else "Not watching")
 
 
 @router.message(Command("start"))
 async def on_start(message: Message, command: CommandObject):
     payload = (command.args or "").strip()
     if payload:
-        text = _token_menu_text(payload)
+        chat_id = message.chat.id
+        text = _token_menu_text(payload, chat_id)
         if text:
             symbol_u = payload.upper().lstrip("/")
-            chat_id = message.chat.id
             sent = await message.answer(
                 text, reply_markup=_token_menu_markup(chat_id, symbol_u), disable_web_page_preview=True
             )
@@ -319,53 +406,49 @@ async def on_t(message: Message, command: CommandObject):
     await message.answer(text, disable_web_page_preview=True)
 
 
+async def _send_token_menu(message: Message, symbol_u: str) -> None:
+    chat_id = message.chat.id
+    text = _token_menu_text(symbol_u, chat_id)
+    if not text:
+        return
+    sent = await message.answer(
+        text, reply_markup=_token_menu_markup(chat_id, symbol_u), disable_web_page_preview=True
+    )
+    async with _token_menus_lock:
+        _token_menus[chat_id] = sent.message_id
+
+
 @router.message(Command("watch"))
 async def on_watch(message: Message, command: CommandObject):
-    symbol = (command.args or "").strip()
-    if not symbol:
+    arg = (command.args or "").strip()
+    if not arg:
         await message.answer("Usage: /watch SPACEX")
         return
-    row = _row_for(symbol)
-    if not row:
-        await message.answer(f"Unknown symbol: {symbol}")
+    symbol_u = _resolve_symbol(arg)
+    if not symbol_u:
+        await message.answer(f"Unknown symbol: {arg}")
         return
 
-    symbol_u = row["symbol"].upper()
-    db = SessionLocal()
-    try:
-        existing = db.execute(
-            select(Watch).where(Watch.chat_id == message.chat.id, Watch.symbol == symbol_u)
-        ).scalar_one_or_none()
-        if existing:
-            await message.answer(f"Already watching {symbol_u} (±{existing.threshold*100:.0f}%).")
-            return
-        db.add(Watch(chat_id=message.chat.id, symbol=symbol_u, threshold=DEFAULT_THRESHOLD))
-        db.commit()
-    finally:
-        db.close()
-
-    await message.answer(f"Watching {symbol_u}. Alert on ±{DEFAULT_THRESHOLD*100:.0f}% premium.")
+    result = _add_watch(message.chat.id, symbol_u)
+    if result == "cap":
+        await message.answer(f"Watch limit reached ({MAX_WATCHES_PER_CHAT}). /unwatch one first.")
+        return
+    await _send_token_menu(message, symbol_u)
 
 
 @router.message(Command("unwatch"))
 async def on_unwatch(message: Message, command: CommandObject):
-    symbol = (command.args or "").strip().upper()
-    if not symbol:
+    arg = (command.args or "").strip()
+    if not arg:
         await message.answer("Usage: /unwatch SPACEX")
         return
-    db = SessionLocal()
-    try:
-        existing = db.execute(
-            select(Watch).where(Watch.chat_id == message.chat.id, Watch.symbol == symbol)
-        ).scalar_one_or_none()
-        if not existing:
-            await message.answer(f"Not watching {symbol}.")
-            return
-        db.delete(existing)
-        db.commit()
-    finally:
-        db.close()
-    await message.answer(f"Stopped watching {symbol}.")
+    symbol_u = _resolve_symbol(arg)
+    if not symbol_u:
+        await message.answer(f"Unknown symbol: {arg}")
+        return
+
+    _remove_watch(message.chat.id, symbol_u)
+    await _send_token_menu(message, symbol_u)
 
 
 @router.message(Command("watches"))
