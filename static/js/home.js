@@ -361,10 +361,6 @@
     els.panel.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (els.tabHome) els.tabHome.classList.toggle('active', !open);
     if (els.tabStocks) els.tabStocks.classList.toggle('active', open);
-    if (open && window.MarktapeTrade && window.MarktapeTrade.isOpen()) {
-      window.MarktapeTrade.close();
-      setSwapTabActive(false);
-    }
     syncDashboard();
     if (open) {
       renderPanel();
@@ -649,7 +645,6 @@
 
   function openTrade() {
     if (!state.address || !window.MarktapeTrade) return;
-    if (panelOpen) closePanel();
     if (location.pathname !== '/swap') history.pushState(null, '', '/swap');
     setSwapTabActive(true);
     window.MarktapeTrade.open({

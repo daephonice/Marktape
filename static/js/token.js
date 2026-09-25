@@ -2,7 +2,7 @@
  *   /api/prices           shared price cache (polled every second)
  *   /api/balances/{addr}  wallet holdings
  *   /api/chart/{symbol}   price history for the chart
- * Send opens send.js on this page; Buy / Sell open trade.js (real Jupiter swap).
+ * Send opens send.js on this page; Buy / Sell open swap.js (frontend only for now).
  * With no holdings only the Buy button shows.
  */
 (function () {
@@ -244,20 +244,9 @@
     window.MarktapeSend.open({ symbol: SYMBOL, getCtx, onSent: refreshBalances });
   });
 
-  window.addEventListener('marktape:trade-panel', (e) => {
-    page.hidden = !!e.detail.open;
-  });
-
   function openSwap(side) {
     if (!state.address) { connect(); return; }
-    if (!window.MarktapeTrade) return;
-    const pay = state.prices.USDC ? 'USDC' : 'SOL';
-    window.MarktapeTrade.open({
-      getCtx,
-      sell: side === 'buy' ? pay : SYMBOL,
-      buy: side === 'buy' ? SYMBOL : pay,
-      onDone: refreshBalances,
-    });
+    if (window.MarktapeSwap) window.MarktapeSwap.open({ side, symbol: SYMBOL, getCtx, onDone: refreshBalances });
   }
   els.buy.addEventListener('click', () => openSwap('buy'));
   els.sell.addEventListener('click', () => openSwap('sell'));
@@ -302,7 +291,6 @@
   });
 
   els.back.addEventListener('click', () => {
-    if (window.MarktapeTrade && window.MarktapeTrade.isOpen()) { window.MarktapeTrade.close(); return; }
     let same = false;
     try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (_) {}
     if (same && history.length > 1) history.back();
