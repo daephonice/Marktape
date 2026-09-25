@@ -19,6 +19,12 @@ def _static_v(rel_path: str) -> str:
 
 templates.env.globals["static_v"] = _static_v
 
+TELEGRAM_BOT_URL = (
+    os.getenv("TELEGRAM_PUBLIC_URL", "").strip()
+    or (f"https://t.me/{u}" if (u := os.getenv("TELEGRAM_BOT_USERNAME", "").strip()) else "")
+)
+templates.env.globals["telegram_bot_url"] = TELEGRAM_BOT_URL
+
 
 @router.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):

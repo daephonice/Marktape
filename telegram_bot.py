@@ -111,8 +111,22 @@ def _live_line(row: dict) -> str:
     return f"{row['symbol']:<10} {price:>10}   {pct:>7}"
 
 
+def _sol_line() -> str | None:
+    live = prices.get_prices()
+    sol = (live or {}).get("prices", {}).get("SOL")
+    if not sol or sol.get("price") is None:
+        return None
+    price = f"${sol['price']:.2f}"
+    chg = sol.get("change24h")
+    pct = f"{'+' if chg and chg > 0 else ''}{chg:.1f}%" if chg is not None else "—"
+    return f"{'SOL':<10} {price:>10}   {pct:>7}"
+
+
 def _live_board_text(rows: list[dict]) -> str:
     lines = [_live_line(r) for r in rows]
+    sol_line = _sol_line()
+    if sol_line:
+        lines.append(sol_line)
     body = "\n".join(lines)
     return f"<b>Marktape — live board</b>\n<code>{body}</code>"
 
