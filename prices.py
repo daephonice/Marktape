@@ -236,9 +236,9 @@ def get_prices() -> dict | None:
 
 def get_assets() -> dict:
     """Static display metadata (name, logo, kind) for every tradable asset."""
-    assets = {sym: {"name": m["name"], "image": m["image"], "kind": "token"} for sym, m in TOKEN_ASSETS.items()}
+    assets = {sym: {"name": m["name"], "image": m["image"], "kind": "token", "mint": m["mint"]} for sym, m in TOKEN_ASSETS.items()}
     for sym, s in _stocks.items():
-        assets[sym] = {"name": s["name"], "image": s["image"], "kind": "stock"}
+        assets[sym] = {"name": s["name"], "image": s["image"], "kind": "stock", "mint": s["mint"]}
     return {"assets": assets}
 
 
