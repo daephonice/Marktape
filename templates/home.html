@@ -62,7 +62,15 @@
   <p class="hm-lock-notice" id="hm-lock-notice">Connect Wallet to Access</p>
 
   <section class="hm-stocks" id="hm-stocks">
-    <h2 class="hm-news-title">Stocks</h2>
+    <div class="hm-stocks-head">
+      <h2 class="hm-news-title">Stocks</h2>
+      {% if telegram_bot_url %}
+      <a class="tk-link tk-tg-link hm-stocks-tg" href="{{ telegram_bot_url }}" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.3-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71l-4.14-3.05-2 1.92c-.24.24-.42.42-.82.42z"/></svg>
+        <span>Watch Tokens on Telegram</span>
+      </a>
+      {% endif %}
+    </div>
     <div class="hm-stk-rows" id="hm-stock-rows"></div>
     <p class="hm-empty" id="hm-stock-empty">Loading…</p>
     <button class="hm-n-toggle" id="hm-stock-toggle" type="button" hidden>
