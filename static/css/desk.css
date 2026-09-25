@@ -557,48 +557,6 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
 .tk-bar.only-buy .tk-act-buy { flex: 0 1 234px; }
 
 /* ==========================================================================
-   Buy / Sell sheet (swap.js)
-   ========================================================================== */
-.swp-root { position: fixed; inset: 0; z-index: 100; --swp-kb: 0px; font-family: 'Geist', -apple-system, sans-serif; color: var(--hm-text, #fafafa); }
-.swp-root[hidden] { display: none; }
-.swp-root button, .swp-root input { font-family: inherit; }
-.swp-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.62); opacity: 0; transition: opacity 0.22s; }
-.swp-backdrop.open { opacity: 1; }
-.swp-sheet {
-  position: absolute; left: 0; right: 0; bottom: var(--swp-kb); max-width: 480px; margin: 0 auto;
-  background: #1c1d21; border-radius: 28px 28px 0 0; text-align: center;
-  padding: 10px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-  transform: translateY(105%); transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.swp-sheet.open { transform: none; }
-.swp-title { margin: 4px 0 14px; font-size: 22px; font-weight: 700; }
-.swp-cur { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--hm-bg, #07090e); }
-.swp-cur-opt { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border: 0; border-radius: 999px; background: transparent; color: var(--hm-muted, #9d9ea2); font-size: 15px; font-weight: 600; cursor: pointer; }
-.swp-cur-opt img { width: 24px; height: 24px; border-radius: 50%; display: block; }
-.swp-cur-opt.active { background: var(--hm-ctrl-on, #45474b); color: var(--hm-text, #fafafa); }
-.swp-cur.single .swp-cur-opt { cursor: default; }
-.swp-bal { margin: 14px 0 0; font-size: 15px; color: var(--hm-muted, #9d9ea2); font-variant-numeric: tabular-nums; }
-.swp-input { display: block; width: 100%; margin: 12px 0 0; padding: 0; background: none; border: 0; outline: 0; text-align: center; color: var(--hm-text, #fafafa); font-size: 56px; font-weight: 600; line-height: 1.2; caret-color: var(--accent); font-variant-numeric: tabular-nums; }
-.swp-input::placeholder { color: #45474b; }
-.swp-quick { display: flex; gap: 10px; margin-top: 14px; }
-.swp-chip { flex: 1; height: 50px; border: 0; border-radius: 25px; background: var(--hm-ctrl, #23252a); color: var(--hm-text, #fafafa); font-size: 17px; font-weight: 500; cursor: pointer; }
-.swp-chip.active { background: #fff; color: #0a0c11; }
-
-.swp-stepper { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
-.swp-step { width: 64px; height: 64px; border: 0; border-radius: 50%; background: var(--hm-ctrl, #23252a); color: var(--hm-text, #fafafa); font-size: 30px; line-height: 1; cursor: pointer; }
-.swp-step:disabled { opacity: 0.4; cursor: default; }
-.swp-pct { font-size: 64px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.swp-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 8px; margin: 24px 0 0; padding: 0; border-radius: 4px; outline: 0; background: linear-gradient(to right, var(--accent) var(--pct, 25%), #2a2c31 var(--pct, 25%)); }
-.swp-range::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
-.swp-range::-moz-range-thumb { width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
-.swp-ticks { display: flex; justify-content: space-between; margin-top: 14px; font-size: 14px; color: var(--hm-muted, #9d9ea2); }
-
-.swp-cta { margin-top: 20px; }
-.swp-est { min-height: 18px; margin: 14px 0 0; font-size: 15px; color: var(--hm-muted, #9d9ea2); font-variant-numeric: tabular-nums; }
-.swp-note { margin: 8px 0 0; font-size: 14px; color: var(--hm-neg, #fb7185); }
-.swp-note:empty { display: none; }
-
-/* ==========================================================================
    Trade (Swap) panel — homepage full-panel, like .stk-panel. Blue theme.
    Lives on body.hm. trade.js.
    ========================================================================== */
