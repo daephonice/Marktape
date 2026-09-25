@@ -20,6 +20,7 @@
 
   const $ = (id) => document.getElementById(id);
   const els = {
+    stack: $('hm-stack'),
     dashboard: $('hm-dashboard'),
     total: $('hm-total'),
     change: $('hm-change'),
@@ -319,6 +320,63 @@
     if (panelOpen) renderPanel();
   }
 
+  // ---- Screen stack (Home / Stocks / Swap slide as one push-transition) -----
+  const SCREEN_ORDER = ['home', 'stocks', 'swap'];
+  let activeScreen = 'home';
+  const ANIM_MS = 320;
+
+  function screenEl(name) {
+    if (name === 'home') return els.dashboard;
+    if (name === 'stocks') return els.panel;
+    if (name === 'swap') return window.MarktapeTrade ? window.MarktapeTrade.panelEl() : null;
+    return null;
+  }
+
+  // Shows `name`, hides the rest, sliding `name` in from the direction
+  // implied by SCREEN_ORDER (right if moving to a later tab, left if
+  // earlier) while the current screen slides fully out the other way.
+  // `instant` skips the animation (first paint / no prior screen).
+  function goToScreen(name, instant) {
+    const from = activeScreen;
+    const fromEl = screenEl(from);
+    const toEl = screenEl(name);
+    activeScreen = name;
+    if (!toEl || fromEl === toEl) return;
+
+    if (instant || !fromEl) {
+      if (fromEl && fromEl !== toEl) fromEl.hidden = true;
+      toEl.hidden = false;
+      toEl.classList.remove('hm-off-left', 'hm-off-right');
+      toEl.style.transform = '';
+      return;
+    }
+
+    const forward = SCREEN_ORDER.indexOf(name) > SCREEN_ORDER.indexOf(from);
+    const stack = els.stack;
+    stack.classList.add('hm-animating');
+
+    toEl.hidden = false;
+    toEl.classList.add(forward ? 'hm-off-right' : 'hm-off-left');
+    fromEl.classList.remove('hm-off-left', 'hm-off-right');
+
+    // Force layout so the starting transform is applied before we
+    // transition both screens to their resting positions.
+    // eslint-disable-next-line no-unused-expressions
+    toEl.offsetHeight;
+
+    requestAnimationFrame(() => {
+      toEl.classList.remove('hm-off-left', 'hm-off-right');
+      fromEl.classList.add(forward ? 'hm-off-left' : 'hm-off-right');
+    });
+
+    setTimeout(() => {
+      if (activeScreen !== name) return; // superseded by a later transition
+      fromEl.hidden = true;
+      fromEl.classList.remove('hm-off-left', 'hm-off-right');
+      stack.classList.remove('hm-animating');
+    }, ANIM_MS + 30);
+  }
+
   // ---- Stocks panel (full list, sorted by market cap) -----------------------
   let panelOpen = false;
   let panelPushed = false;
@@ -351,8 +409,11 @@
   }
 
   function syncDashboard() {
+    // Kept as a light sync point for callers that only changed swap state
+    // (e.g. trade.js's own open/close) without going through goToScreen.
     const swapOpen = !!(window.MarktapeTrade && window.MarktapeTrade.isOpen());
-    if (els.dashboard) els.dashboard.hidden = panelOpen || swapOpen;
+    if (swapOpen && activeScreen !== 'swap') goToScreen('swap');
+    else if (!swapOpen && !panelOpen && activeScreen === 'swap') goToScreen('home');
   }
 
   function setPanel(open) {
@@ -361,7 +422,7 @@
     els.panel.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (els.tabHome) els.tabHome.classList.toggle('active', !open);
     if (els.tabStocks) els.tabStocks.classList.toggle('active', open);
-    syncDashboard();
+    goToScreen(open ? 'stocks' : 'home');
     if (open) {
       renderPanel();
       els.panel.scrollTop = 0;
@@ -699,8 +760,8 @@
   // ---- Boot ---------------------------------------------------------------
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
   const bootPanel = window.__MKT_OPEN_PANEL__ || (location.pathname === '/stocks' ? 'stocks' : location.pathname === '/swap' ? 'swap' : '');
-  if (bootPanel === 'stocks') setPanel(true);
-  else if (bootPanel === 'swap' && state.address) openTrade();
+  if (bootPanel === 'stocks') { activeScreen = 'stocks'; setPanel(true); goToScreen('stocks', true); }
+  else if (bootPanel === 'swap' && state.address) { activeScreen = 'swap'; openTrade(); goToScreen('swap', true); }
   else if (bootPanel === 'swap') history.replaceState(null, '', '/');
   syncDashboard();
   renderAll();

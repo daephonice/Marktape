@@ -89,7 +89,7 @@
   function build() {
     if (root) return;
     root = document.createElement('section');
-    root.className = 'trd-panel';
+    root.className = 'trd-panel hm-screen';
     root.hidden = true;
     root.setAttribute('aria-label', 'Swap');
     root.setAttribute('aria-hidden', 'true');
@@ -160,11 +160,11 @@
         </div>
       </div>`;
     document.body.appendChild(root);
-    // Placed in normal page flow (inside <main>, alongside the dashboard)
-    // rather than left as a body-level overlay, so /swap reads as its own
-    // page like /stocks and /t/SYMBOL, not a panel stacked on top of home.
-    const main = document.querySelector('main');
-    if (main) main.appendChild(root);
+    // Placed inside the home page's screen stack (#hm-stack), as a sibling
+    // of #hm-dashboard / #stk-panel, so it slides with them as one set of
+    // screens instead of being a body-level overlay.
+    const stack = document.getElementById('hm-stack');
+    if (stack) stack.appendChild(root);
 
     const q = (s) => root.querySelector(s);
     Object.assign(R, {
@@ -569,10 +569,11 @@
       sellRaw: '', order: null, quoting: false, quoteTimer: null, quoteReq: 0,
       note: '', swapping: false,
     };
-    root.hidden = false;
     root.setAttribute('aria-hidden', 'false');
     document.documentElement.classList.add('trd-lock');
     root.classList.add('open');
+    // #hm-stack's router (home.js) owns root.hidden / the slide transition;
+    // it listens for this event and animates root in.
     window.dispatchEvent(new CustomEvent('marktape:trade-panel', { detail: { open: true } }));
     render();
   }
@@ -588,11 +589,12 @@
     root.classList.remove('open');
     root.setAttribute('aria-hidden', 'true');
     document.documentElement.classList.remove('trd-lock');
-    root.hidden = true;
+    // root.hidden is set by the router once its exit animation finishes.
     window.dispatchEvent(new CustomEvent('marktape:trade-panel', { detail: { open: false } }));
   }
 
   function isOpen() { return !!S; }
+  function panelEl() { build(); return root; }
 
-  window.MarktapeTrade = { open, close, isOpen };
+  window.MarktapeTrade = { open, close, isOpen, panelEl };
 })();
