@@ -22,6 +22,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot, Dispatcher, Router
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from aiogram.client.default import DefaultBotProperties
@@ -29,6 +30,7 @@ from aiogram.client.default import DefaultBotProperties
 from sqlalchemy import select
 
 import prestocks
+import prices
 from database import SessionLocal
 from models import Watch
 
@@ -65,6 +67,65 @@ def _board_line(row: dict) -> str:
     return f"{row['symbol']:<10} {pct:>7}   ${row['tokenPrice']:.2f} vs ${row['markPrice']:.2f}"
 
 
+def _live_rows() -> list[dict]:
+    """One row per PreStock for the /start live board: symbol, tape price,
+    24h% (falls back to premium if 24h change isn't available yet), sorted
+    stable by market cap desc (falls back to the snapshot's existing
+    premium-desc order when mc isn't available)."""
+    snap = prestocks.get_cached_snapshot()
+    tokens = snap.get("tokens", [])
+    if not tokens:
+        return []
+
+    live = prices.get_prices()
+    live_prices = (live or {}).get("prices", {})
+
+    rows = []
+    for t in tokens:
+        sym = t["symbol"].upper()
+        p = live_prices.get(sym)
+        price = p["price"] if p and p.get("price") is not None else t.get("tokenPrice")
+        change24h = p.get("change24h") if p else None
+        mc = p.get("mc") if p else None
+        rows.append({
+            "symbol": t["symbol"],
+            "price": price,
+            "change24h": change24h,
+            "premium": t.get("premium"),
+            "mc": mc,
+        })
+
+    if any(r["mc"] is not None for r in rows):
+        rows.sort(key=lambda r: r["mc"] if r["mc"] is not None else -1, reverse=True)
+    # else: keep the snapshot's existing (premium-desc) order — already stable.
+    return rows
+
+
+def _live_line(row: dict) -> str:
+    price = f"${row['price']:.2f}" if row["price"] is not None else "—"
+    if row["change24h"] is not None:
+        sign = "+" if row["change24h"] > 0 else ""
+        pct = f"{sign}{row['change24h']:.1f}%"
+    else:
+        pct = prestocks.format_premium(row["premium"])
+    return f"{row['symbol']:<10} {price:>10}   {pct:>7}"
+
+
+def _live_board_text() -> str | None:
+    rows = _live_rows()
+    if not rows:
+        return None
+    lines = [_live_line(r) for r in rows]
+    body = "\n".join(lines)
+    return f"<b>Marktape — live board</b>\n<code>{body}</code>"
+
+
+# chat_id -> message_id for the one active live board per chat. In-memory
+# only (spec: no DB). A new /start (no payload) replaces the old target.
+_live_boards: dict[int, int] = {}
+_live_board_lock = asyncio.Lock()
+
+
 @router.message(Command("start"))
 async def on_start(message: Message, command: CommandObject):
     payload = (command.args or "").strip()
@@ -73,13 +134,20 @@ async def on_start(message: Message, command: CommandObject):
         if row:
             await message.answer(_card_text(row), disable_web_page_preview=True)
             return
+
     text = (
         "Marktape — mark vs tape for PreStocks.\n"
-        "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n"
-        f"Live board: {WEB_PUBLIC_URL}\n\n"
-        "Not for US persons. Not investment advice."
+        "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n\n"
     )
-    await message.answer(text, disable_web_page_preview=True)
+    board_text = _live_board_text()
+    if board_text:
+        text += board_text
+    else:
+        text += "Board is warming up — try again in a moment."
+
+    sent = await message.answer(text, disable_web_page_preview=True)
+    async with _live_board_lock:
+        _live_boards[message.chat.id] = sent.message_id
 
 
 @router.message(Command("board"))
@@ -242,10 +310,69 @@ async def _alert_loop(bot: Bot):
         await asyncio.sleep(60)
 
 
+# ---------------------------------------------------------------------------
+# Live board loop — edits each chat's /start message every 5s.
+# ---------------------------------------------------------------------------
+
+LIVE_BOARD_INTERVAL = 5
+
+_DEAD_MESSAGE_MARKERS = (
+    "message to edit not found",
+    "message to be edited not found",
+    "message can't be found",
+    "chat not found",
+)
+
+
+async def _run_live_board_pass(bot: Bot):
+    text = _live_board_text()
+    if text is None:
+        return
+
+    async with _live_board_lock:
+        targets = list(_live_boards.items())
+
+    dead: list[tuple[int, int]] = []  # (chat_id, message_id) pairs to drop
+    for chat_id, message_id in targets:
+        try:
+            await bot.edit_message_text(text, chat_id=chat_id, message_id=message_id)
+        except TelegramBadRequest as e:
+            msg = str(e).lower()
+            if "message is not modified" in msg:
+                continue
+            if any(marker in msg for marker in _DEAD_MESSAGE_MARKERS):
+                dead.append((chat_id, message_id))
+            else:
+                log.warning("telegram_bot: live board edit failed for chat %s: %s", chat_id, e)
+        except TelegramForbiddenError:
+            # Bot was blocked / chat gone.
+            dead.append((chat_id, message_id))
+        except Exception:
+            log.warning("telegram_bot: live board edit failed for chat %s", chat_id, exc_info=True)
+
+    if dead:
+        async with _live_board_lock:
+            for chat_id, message_id in dead:
+                # Only drop if it's still pointing at the message we just
+                # failed on — a fresh /start may have replaced it since.
+                if _live_boards.get(chat_id) == message_id:
+                    del _live_boards[chat_id]
+
+
+async def _live_board_loop(bot: Bot):
+    while True:
+        try:
+            await _run_live_board_pass(bot)
+        except Exception:
+            log.exception("telegram_bot: live board loop iteration failed")
+        await asyncio.sleep(LIVE_BOARD_INTERVAL)
+
+
 _bot: Bot | None = None
 _dp: Dispatcher | None = None
 _task: asyncio.Task | None = None
 _alert_task: asyncio.Task | None = None
+_live_board_task: asyncio.Task | None = None
 
 
 async def _polling_loop():
@@ -254,9 +381,11 @@ async def _polling_loop():
     _dp = Dispatcher()
     _dp.include_router(router)
 
-    global _alert_task
+    global _alert_task, _live_board_task
     if _alert_task is None or _alert_task.done():
         _alert_task = asyncio.create_task(_alert_loop(_bot))
+    if _live_board_task is None or _live_board_task.done():
+        _live_board_task = asyncio.create_task(_live_board_loop(_bot))
 
     while True:
         try:
