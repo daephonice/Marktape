@@ -94,6 +94,7 @@
     root.setAttribute('aria-hidden', 'false');
     root.innerHTML = `
       <div class="hm-col trd-col">
+        <h2 class="stk-title">Swap</h2>
         <div class="trd-card" data-side="sell">
           <div class="trd-card-row">
             <span class="trd-card-label">Sell</span>

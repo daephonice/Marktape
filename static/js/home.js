@@ -376,6 +376,17 @@
       history.replaceState({ screen: name }, '', pathOf(name));
     }
     if (prev !== name && name !== 'home') window.scrollTo(0, 0);
+    requestAnimationFrame(syncScreenOverflow);
+  }
+
+  function syncScreenOverflow() {
+    if (!els.track) return;
+    els.track.querySelectorAll('.hm-screen').forEach((p) => {
+      p.classList.remove('hm-can-scroll');
+      const need = p.scrollHeight > p.clientHeight + 2;
+      p.classList.toggle('hm-can-scroll', need);
+      if (!need) p.scrollTop = 0;
+    });
   }
 
   // ---- Stocks panel (full list, sorted by market cap) -----------------------
@@ -438,7 +449,7 @@
     syncList(els.holdRows, rows, (r) => r.symbol, buildHoldRow, updateHoldRow);
     const loading = !!state.address && state.holdings === null;
     els.holdEmpty.hidden = rows.length > 0 || loading;
-    els.holdEmpty.textContent = state.address ? 'No Holdings yet' : 'Connect wallet';
+    els.holdEmpty.textContent = 'No Holdings yet';
     if (hldOpen) renderHldModal();
   }
 
@@ -578,6 +589,7 @@
     renderStocks();
     renderHoldings();
     renderNews();
+    requestAnimationFrame(syncScreenOverflow);
   }
 
   // ---- Data ---------------------------------------------------------------
@@ -692,7 +704,7 @@
     tickBalances();
   });
 
-  window.addEventListener('resize', measureNews);
+  window.addEventListener('resize', () => { measureNews(); syncScreenOverflow(); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureNews);
 
   // ---- Boot ---------------------------------------------------------------
