@@ -458,9 +458,31 @@ button.hm-tab.active { background: var(--hm-ctrl-on); }
   transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .hm-track.hm-no-anim { transition: none; }
-body.hm:has(#hm-stack) {
+body.hm:has(#hm-stack).hm-no-ptr {
   overflow: hidden;
   height: 100dvh;
+  overscroll-behavior-y: none;
+}
+body.hm:has(#hm-stack).hm-ptr {
+  overflow: auto;
+  height: auto;
+  min-height: 100dvh;
+  overscroll-behavior-y: auto;
+}
+body.hm.hm-ptr .hm-stack {
+  flex: 1 0 auto;
+  min-height: calc(100dvh - 64px);
+  overflow: visible;
+}
+body.hm.hm-ptr .hm-track {
+  height: auto;
+  min-height: calc(100dvh - 64px);
+}
+body.hm.hm-ptr .hm-screen {
+  height: auto;
+  min-height: calc(100dvh - 64px);
+  overflow: visible;
+  overscroll-behavior-y: auto;
 }
 .hm-screen {
   flex: 0 0 100%;
@@ -475,6 +497,9 @@ body.hm:has(#hm-stack) {
 .hm-screen.hm-can-scroll {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+body.hm.hm-no-ptr .hm-screen.hm-can-scroll {
+  overscroll-behavior-y: none;
 }
 
 .stk-panel,
@@ -667,7 +692,8 @@ html.hld-lock, html.hld-lock body { overflow: hidden; }
    Lives on body.hm. trade.js.
    ========================================================================== */
 html.trd-lock, html.trd-lock body { overflow: hidden; }
-html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
+html.hld-lock .hm-nav { display: none; }
+html.trd-tok-lock { overflow: hidden; }
 
 .trd-panel {
   padding-top: 2px;
@@ -736,7 +762,7 @@ html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 .trd-title { margin: 0; font-size: 20px; font-weight: 600; }
 
 /* Token selector */
-.trd-tok { position: fixed; inset: 0; z-index: 110; }
+.trd-tok { position: fixed; inset: 0; z-index: 200; }
 .trd-tok[hidden] { display: none; }
 .trd-tok-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); }
 .trd-tok-sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto; max-height: 72%; overflow-y: auto; background: #1c1d21; border-radius: 28px 28px 0 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
@@ -751,7 +777,7 @@ html.trd-tok-lock .hm-nav, html.hld-lock .hm-nav { display: none; }
 .trd-tok-main small, .trd-tok-side small { font-size: 13px; color: var(--hm-muted, #9d9ea2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Price Info modal */
-.trd-info { position: fixed; inset: 0; z-index: 120; }
+.trd-info { position: fixed; inset: 0; z-index: 210; }
 .trd-info[hidden] { display: none; }
 .trd-info-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.62); opacity: 0; transition: opacity 0.22s; }
 .trd-info-back.open { opacity: 1; }
