@@ -278,26 +278,38 @@
     return syms;
   }
 
+  function metricLine(row, keys) {
+    const line = h('div', 'hm-n-line');
+    keys.forEach((k, i) => {
+      if (i) line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+      line.appendChild(h('span', 'hm-dim', k.label + ' '));
+      line.appendChild(h('span', 'hm-stk-' + k.key));
+    });
+    row.appendChild(line);
+    return line;
+  }
+
   function buildStockRow(sym) {
     const row = h('a', 'hm-stk-row');
     row.href = '/t/' + encodeURIComponent(sym);
 
-    const token = h('div', 'hm-stk-token');
-    const lg = logo(sym, 32);
+    const head = h('div', 'hm-n-head');
+    const lg = logo(sym, 36);
     lg.appendChild(badgeEl());
-    token.appendChild(lg);
-    const id = h('div', 'hm-stk-id');
+    head.appendChild(lg);
     const name = h('div', 'hm-sym');
     name.appendChild(h('span', 'hm-sym-text', sym));
-    name.appendChild(icon('i-verified', 13, 'hm-verified'));
-    id.appendChild(name);
-    id.appendChild(h('div', 'hm-stk-chg'));
-    token.appendChild(id);
-    row.appendChild(token);
+    name.appendChild(icon('i-verified', 16, 'hm-verified'));
+    head.appendChild(name);
+    head.appendChild(h('span', 'hm-stk-chg'));
+    row.appendChild(head);
 
-    ['price', 'mc', 'mark', 'prem'].forEach((k) => {
-      row.appendChild(h('div', 'hm-stk-cell hm-stk-' + k));
-    });
+    metricLine(row, [
+      { key: 'price', label: 'Price' },
+      { key: 'mc', label: 'Mcap' },
+      { key: 'mark', label: 'Mark' },
+      { key: 'prem', label: 'Prem' },
+    ]);
     return row;
   }
 
@@ -311,7 +323,7 @@
     node.querySelector('.hm-stk-mark').textContent = p.mark ? fmtPrice(p.mark) : '—';
     const prem = node.querySelector('.hm-stk-prem');
     prem.textContent = fmtPrem(p.premium);
-    prem.className = 'hm-stk-cell hm-stk-prem ' + premCls(p.premium);
+    prem.className = 'hm-stk-prem ' + premCls(p.premium);
   }
 
   function buildHoldRow(item) {
@@ -444,6 +456,12 @@
     line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
     line.appendChild(h('span', 'hm-dim', 'MC '));
     line.appendChild(h('span', 'hm-n-mc'));
+    line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+    line.appendChild(h('span', 'hm-dim', 'Mark '));
+    line.appendChild(h('span', 'hm-n-mark'));
+    line.appendChild(h('span', 'hm-dim hm-n-dot', ' • '));
+    line.appendChild(h('span', 'hm-dim', 'Prem '));
+    line.appendChild(h('span', 'hm-n-prem'));
     art.appendChild(line);
 
     art.appendChild(h('p', 'hm-n-body'));
@@ -469,6 +487,10 @@
     chg.className = 'hm-n-chg';
     setPct(chg, p ? p.change24h : null);
     node.querySelector('.hm-n-mc').textContent = p && p.mc ? fmtCompact(p.mc) : '—';
+    node.querySelector('.hm-n-mark').textContent = p && p.mark ? fmtPrice(p.mark) : '—';
+    const prem = node.querySelector('.hm-n-prem');
+    prem.textContent = fmtPrem(p ? p.premium : null);
+    prem.className = 'hm-n-prem ' + premCls(p ? p.premium : null);
     const body = node.querySelector('.hm-n-body');
     if (body.textContent !== item.body) {
       body.textContent = item.body;
