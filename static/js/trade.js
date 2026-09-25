@@ -178,6 +178,10 @@
       iRate: q('[data-i-rate]'), iImpact: q('[data-i-impact]'), iMin: q('[data-i-min]'),
       iFees: q('[data-i-fees]'), iRoutes: q('[data-i-routes]'), iIn: q('[data-i-inmint]'), iOut: q('[data-i-outmint]'),
     });
+    // Pager track uses transform, which turns position:fixed into a clipped
+    // local box. Sheets must live on document.body.
+    if (R.tok) document.body.appendChild(R.tok);
+    if (R.infoModal) document.body.appendChild(R.infoModal);
 
     R.pillSell.addEventListener('click', () => openTokens('sell'));
     R.pillBuy.addEventListener('click', () => openTokens('buy'));

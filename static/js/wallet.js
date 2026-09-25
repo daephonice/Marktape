@@ -298,7 +298,10 @@
 
       const sendFeature = wallet.features['solana:signAndSendTransaction'];
       if (sendFeature) {
-        const results = await sendFeature.signAndSendTransaction({ account, transaction: raw, chain });
+        const results = await sendFeature.signAndSendTransaction({
+          account, transaction: raw, chain,
+          options: { skipPreflight: true },
+        });
         const first = (results || [])[0];
         if (first && first.signature) {
           const sig = typeof first.signature === 'string' ? first.signature : bytesToBase64(first.signature);
@@ -360,7 +363,10 @@
     }
     const sendFeature = wallet.features['solana:signAndSendTransaction'];
     if (sendFeature) {
-      const results = await sendFeature.signAndSendTransaction({ account, transaction: raw, chain });
+      const results = await sendFeature.signAndSendTransaction({
+        account, transaction: raw, chain,
+        options: { skipPreflight: true },
+      });
       const first = (results || [])[0];
       if (first && first.signature) return { signature: bytesToBase58(first.signature) };
     }
