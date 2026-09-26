@@ -1,17 +1,19 @@
 /* Homepage. Driven by:
  *   /api/prices           shared price cache (refreshes every second)
+ *   /api/board            grouped tape board (mark + per-wrapper premiums)
  *   /api/balances/{addr}  wallet holdings
  *   /api/news             news feed
  * Send is wallet-gated. Swap → /swap. Lend → /lend.
  */
 (function () {
   const PRICE_MS = 1000;
+  const BOARD_MS = 5000;
   const BALANCE_MS = 6000;
   const NEWS_MS = 60000;
   const ASSETS_RETRY_MS = 3000;
   const LIST_MAX = 3;
-  const TOP_REFRESH_MS = 30000;
   const NON_STOCKS = new Set(['BNB', 'USDT', 'USDC']);
+  const PLAT_LABEL = { xstocks: 'x', ondo: 'Ondo', bstocks: 'b' };
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -45,8 +47,8 @@
     prices: {},
     assets: {},
     loaded: false,
-    top: [],
-    topAt: 0,
+    groups: [],
+    groupsLoaded: false,
     news: null,
     stocksOpen: false,
   };
@@ -239,27 +241,6 @@
     return row;
   }
 
-  function stockSyms() {
-    return Object.keys(state.prices).filter((sym) => !NON_STOCKS.has(sym));
-  }
-
-  const mcOf = (sym) => (state.prices[sym] && state.prices[sym].mc) || 0;
-
-  function pickTop() {
-    const fresh = Date.now() - state.topAt < TOP_REFRESH_MS;
-    if (fresh && state.top.length && state.top.every((s) => state.prices[s])) return state.top;
-    const syms = stockSyms();
-    if (!syms.length) return [];
-    const move = (s) => {
-      const c = state.prices[s].change24h;
-      return c === null || c === undefined ? -1 : Math.abs(c);
-    };
-    syms.sort((a, b) => move(b) - move(a) || mcOf(b) - mcOf(a) || a.localeCompare(b));
-    state.top = syms.slice(0, LIST_MAX);
-    state.topAt = Date.now();
-    return state.top;
-  }
-
   function fmtPrem(p) {
     if (p === null || p === undefined || !isFinite(p)) return '—';
     const pctv = p * 100;
@@ -272,58 +253,77 @@
     return p > 0 ? 'pos' : 'neg';
   }
 
-  function pickAll() {
-    const syms = stockSyms();
-    syms.sort((a, b) => mcOf(b) - mcOf(a) || a.localeCompare(b));
-    return syms;
+  function groupLogo(g, size) {
+    const wrap = h('span', 'hm-logo-wrap');
+    wrap.style.width = wrap.style.height = size + 'px';
+    const empty = () => h('span', 'hm-logo hm-logo-empty');
+    const src = g.wrappers.map((w) => w.image).find(Boolean);
+    if (src) {
+      const img = h('img', 'hm-logo');
+      img.alt = '';
+      img.loading = 'lazy';
+      img.src = src;
+      img.addEventListener('error', () => img.replaceWith(empty()));
+      wrap.appendChild(img);
+    } else {
+      wrap.appendChild(empty());
+    }
+    return wrap;
   }
 
-  function metricLine(row, keys) {
-    const line = h('div', 'hm-n-line');
-    keys.forEach((k, i) => {
-      if (i) line.appendChild(h('span', 'hm-dim hm-n-dot', '·'));
-      line.appendChild(h('span', 'hm-dim', k.label + ' '));
-      line.appendChild(h('span', 'hm-stk-' + k.key));
-    });
-    row.appendChild(line);
-    return line;
-  }
-
-  function buildStockRow(sym) {
+  function buildStockRow(g) {
     const row = h('a', 'hm-stk-row');
-    row.href = '/t/' + encodeURIComponent(sym);
+    row.href = '/t/' + encodeURIComponent(g.underlying);
 
     const head = h('div', 'hm-n-head');
-    const lg = logo(sym, 36);
+    const lg = groupLogo(g, 36);
     lg.appendChild(badgeEl());
     head.appendChild(lg);
     const name = h('div', 'hm-sym');
-    name.appendChild(h('span', 'hm-sym-text', sym));
+    name.appendChild(h('span', 'hm-sym-text', g.underlying));
     name.appendChild(icon('i-verified', 16, 'hm-verified'));
-    name.appendChild(h('span', 'hm-stk-chg'));
     head.appendChild(name);
+    head.appendChild(h('span', 'hm-stk-mark'));
     row.appendChild(head);
 
-    metricLine(row, [
-      { key: 'price', label: 'Price' },
-      { key: 'mc', label: 'Mcap' },
-      { key: 'mark', label: 'Mark' },
-      { key: 'prem', label: 'Prem' },
-    ]);
+    const tape = h('div', 'hm-tape-row');
+    tape.appendChild(h('div', 'hm-tape-cell'));
+    tape.appendChild(h('div', 'hm-tape-cell'));
+    tape.appendChild(h('div', 'hm-tape-cell'));
+    row.appendChild(tape);
+
+    const foot = h('div', 'hm-n-line hm-stk-foot');
+    foot.appendChild(h('span', 'hm-dim hm-stk-side'));
+    foot.appendChild(h('span', 'hm-dim hm-n-dot', '·'));
+    foot.appendChild(h('span', 'hm-dim hm-stk-session'));
+    row.appendChild(foot);
     return row;
   }
 
-  function updateStockRow(node, sym) {
-    const p = state.prices[sym] || {};
-    const chg = node.querySelector('.hm-stk-chg');
-    chg.className = 'hm-stk-chg';
-    setPct(chg, p.change24h);
-    node.querySelector('.hm-stk-price').textContent = p.price ? fmtPrice(p.price) : '—';
-    node.querySelector('.hm-stk-mc').textContent = p.mc ? fmtCompact(p.mc) : '—';
-    node.querySelector('.hm-stk-mark').textContent = p.mark ? fmtPrice(p.mark) : '—';
-    const prem = node.querySelector('.hm-stk-prem');
-    prem.textContent = fmtPrem(p.premium);
-    prem.className = 'hm-stk-prem ' + premCls(p.premium);
+  function updateStockRow(node, g) {
+    node.querySelector('.hm-stk-mark').textContent = g.markPrice ? fmtPrice(g.markPrice) : '—';
+
+    ['xstocks', 'ondo', 'bstocks'].forEach((plat, i) => {
+      const w = g.wrappers.find((x) => x.platform === plat);
+      const holder = node.querySelectorAll('.hm-tape-cell')[i];
+      holder.textContent = '';
+      holder.appendChild(h('span', 'hm-tape-lbl', PLAT_LABEL[plat]));
+      if (w && w.tokenPrice) {
+        holder.appendChild(h('span', 'hm-tape-val', fmtPrice(w.tokenPrice)));
+        holder.appendChild(h('span', 'hm-tape-prem ' + premCls(w.premium), fmtPrem(w.premium)));
+      } else {
+        holder.appendChild(h('span', 'hm-tape-val', '—'));
+        holder.appendChild(h('span', 'hm-tape-prem flat', '—'));
+      }
+    });
+
+    const cheapW = g.wrappers.find((x) => x.symbol === g.cheapest);
+    const richW = g.wrappers.find((x) => x.symbol === g.richest);
+    const side = node.querySelector('.hm-stk-side');
+    side.textContent = (cheapW && richW && g.cheapest !== g.richest)
+      ? `Buy ${PLAT_LABEL[cheapW.platform] || cheapW.platform} / Sell ${PLAT_LABEL[richW.platform] || richW.platform}`
+      : '—';
+    node.querySelector('.hm-stk-session').textContent = (state.session && state.session.label) || '';
   }
 
   function buildHoldRow(item) {
@@ -344,11 +344,11 @@
   }
 
   function renderStocks() {
-    const all = pickAll();
-    const rows = state.stocksOpen ? all : pickTop();
-    syncList(els.stockRows, rows, (s) => s, buildStockRow, updateStockRow);
+    const all = state.groups;
+    const rows = state.stocksOpen ? all : all.slice(0, LIST_MAX);
+    syncList(els.stockRows, rows, (g) => g.underlying, buildStockRow, updateStockRow);
     els.stockEmpty.hidden = rows.length > 0;
-    els.stockEmpty.textContent = state.loaded ? 'No stocks available' : 'Loading…';
+    els.stockEmpty.textContent = state.groupsLoaded ? 'No stocks available' : 'Loading…';
     if (els.stockToggle) {
       els.stockToggle.hidden = all.length <= LIST_MAX;
       const label = els.stockToggle.querySelector('.hm-n-toggle-text');
@@ -557,6 +557,21 @@
     }
   }
 
+  let boardBusy = false;
+  async function tickBoard() {
+    if (document.hidden || boardBusy) return;
+    boardBusy = true;
+    try {
+      const data = await getJSON('/api/board');
+      state.groups = data.groups || [];
+      state.session = data.session || null;
+      state.groupsLoaded = true;
+      renderStocks();
+    } catch (err) { /* keep last groups */ } finally {
+      boardBusy = false;
+    }
+  }
+
   let balancesFor = null;
   async function tickBalances() {
     const addr = state.address;
@@ -609,6 +624,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     tickPrices();
+    tickBoard();
     tickBalances();
   });
 
@@ -619,9 +635,11 @@
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
   renderAll();
   tickPrices();
+  tickBoard();
   tickBalances();
   loadNews();
   setInterval(tickPrices, PRICE_MS);
+  setInterval(tickBoard, BOARD_MS);
   setInterval(tickBalances, BALANCE_MS);
   setInterval(loadNews, NEWS_MS);
 })();
