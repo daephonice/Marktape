@@ -653,6 +653,19 @@
 
   window.addEventListener('marktape:wallet', (e) => setAddress(e.detail.address));
 
+  let sessionBusy = false;
+  async function tickSession() {
+    if (document.hidden || sessionBusy) return;
+    sessionBusy = true;
+    try {
+      const data = await getJSON('/api/session');
+      // /api/board's session (when it lands) reflects the same clock; don't fight it, just fill the gap.
+      if (!state.session) { state.session = data; renderSession(); }
+    } catch (err) { /* keep last session */ } finally {
+      sessionBusy = false;
+    }
+  }
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     tickPrices();
@@ -669,9 +682,11 @@
   tickPrices();
   tickBoard();
   tickBalances();
+  tickSession();
   loadNews();
   setInterval(tickPrices, PRICE_MS);
   setInterval(tickBoard, BOARD_MS);
   setInterval(tickBalances, BALANCE_MS);
+  setInterval(tickSession, 30000);
   setInterval(loadNews, NEWS_MS);
 })();
