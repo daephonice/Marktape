@@ -1,21 +1,31 @@
 /* Token page (/t/SYMBOL). Same data sources as the homepage:
+ *   /api/token/{symbol}   group data (mark, three tapes, cheapest/richest rail) for RWA names
  *   /api/prices           shared price cache (polled every second)
  *   /api/balances/{addr}  wallet holdings
  *   /api/chart/{symbol}   price history for the chart
  * Send opens send.js on this page; Buy / Sell open swap.js (frontend only for now).
  * With no holdings only the Buy button shows.
+ *
+ * Group pages (data-kind="group", e.g. /t/NVDA or the legacy /t/NVDAx): the traded
+ * SYMBOL is the cheapest rail (auto-picked, or the wrapper the URL/legacy link named
+ * if you want a specific one focused) and Lend only shows when that rail is a Venus
+ * bStock wrapper.
  */
 (function () {
   'use strict';
   const page = document.getElementById('token-page');
   if (!page) return;
 
-  const SYMBOL = page.dataset.symbol;
+  const IS_GROUP = page.dataset.kind === 'group';
+  const UNDERLYING = page.dataset.underlying || '';
+  const FOCUS = page.dataset.focus || '';
+  let SYMBOL = page.dataset.symbol; // traded wrapper once resolved (group) or the asset itself
   const PRICE_MS = 1000;
   const BALANCE_MS = 6000;
   const CHART_MS = 30000;
   const UP = '#4ade80';
   const DOWN = '#fb7185';
+  const PLAT_LABEL = { xstocks: 'x', ondo: 'Ondo', bstocks: 'b' };
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -23,9 +33,11 @@
     stats: $('tk-stats'), mc: $('tk-mc'), mark: $('tk-mark'), prem: $('tk-prem'),
     plot: $('tk-plot'), axis: $('tk-axis'), noHist: $('tk-nohist'), ranges: $('tk-ranges'),
     pos: $('tk-pos'), posVal: $('tk-pos-val'), posAmt: $('tk-pos-amt'), posDelta: $('tk-pos-delta'), posPct: $('tk-pos-pct'), posPnl: $('tk-pos-pnl'),
-    bar: $('tk-bar'), send: $('tk-send'), sell: $('tk-sell'), buy: $('tk-buy'),
+    bar: $('tk-bar'), send: $('tk-send'), sell: $('tk-sell'), buy: $('tk-buy'), lend: $('tk-lend'),
     back: $('tk-back'), share: $('tk-share'), mint: $('tk-mint'), mintText: $('tk-mint-text'),
     about: $('tk-about'), aboutText: $('tk-about-text'), more: $('tk-readmore'),
+    logo: $('tk-logo'), symText: $('tk-sym-text'), aboutName: $('tk-about-name'), urlLink: $('tk-url-link'), urlText: $('tk-url-text'),
+    tapeRow: $('tk-tape-row'),
   };
 
   const state = {
@@ -35,6 +47,7 @@
     assets: {},
     range: '1D',
     points: [],     // [[ms, price], ...] history for the selected range
+    group: null,    // /api/token/{underlying} result once loaded (group pages only)
   };
 
   // ---- Formatting ---------------------------------------------------------
@@ -248,6 +261,87 @@
     setTimeout(tickBalances, 2500); // pick up the settled balance
   };
 
+  // ---- Group (RWA name page: mark + three tapes + cheapest/Lend rail) -----
+  function fmtPrem(p) {
+    if (p === null || p === undefined || !isFinite(p)) return '—';
+    const r = Number((p * 100).toFixed(1));
+    return (r > 0 ? '+' : '') + r.toString() + '%';
+  }
+  const premCls = (p) => (!(p > 0) && !(p < 0) ? 'flat' : (p > 0 ? 'pos' : 'neg'));
+
+  function renderTapeRow(g) {
+    if (!els.tapeRow) return;
+    const cells = els.tapeRow.querySelectorAll('.hm-tape-cell');
+    ['xstocks', 'ondo', 'bstocks'].forEach((plat, i) => {
+      const w = g.wrappers.find((x) => x.platform === plat);
+      const cell = cells[i];
+      if (!cell) return;
+      cell.textContent = '';
+      const lbl = document.createElement('span'); lbl.className = 'hm-tape-lbl'; lbl.textContent = PLAT_LABEL[plat];
+      cell.appendChild(lbl);
+      if (w && w.tokenPrice) {
+        const val = document.createElement('span'); val.className = 'hm-tape-val'; val.textContent = fmtPrice(w.tokenPrice);
+        const prem = document.createElement('span'); prem.className = 'hm-tape-prem ' + premCls(w.premium); prem.textContent = fmtPrem(w.premium);
+        cell.appendChild(val); cell.appendChild(prem);
+      } else {
+        const val = document.createElement('span'); val.className = 'hm-tape-val'; val.textContent = '—';
+        const prem = document.createElement('span'); prem.className = 'hm-tape-prem flat'; prem.textContent = '—';
+        cell.appendChild(val); cell.appendChild(prem);
+      }
+    });
+  }
+
+  function applyGroup(g) {
+    state.group = g;
+    // Trade the cheapest rail unless the URL named a specific wrapper (e.g. legacy /t/NVDAx).
+    const focusW = g.wrappers.find((w) => w.symbol === FOCUS);
+    const cheapW = g.wrappers.find((w) => w.symbol === g.cheapest);
+    const tradeW = focusW || cheapW || g.wrappers[0];
+    if (!tradeW) return;
+    SYMBOL = tradeW.symbol;
+    page.dataset.symbol = SYMBOL;
+
+    if (els.symText) els.symText.textContent = UNDERLYING;
+    if (els.aboutName) els.aboutName.textContent = g.name;
+    if (els.aboutText && !els.aboutText.textContent) {
+      els.aboutText.textContent = `${g.name} is a BNB Chain tokenized equity. Economic exposure only — no ownership, voting or other legal rights.`;
+    }
+    if (els.logo) {
+      const src = g.wrappers.map((w) => w.image).find(Boolean);
+      if (src && els.logo.tagName === 'IMG') els.logo.src = src;
+    }
+    if (els.mint) els.mint.dataset.mint = tradeW.mint || '';
+    if (els.mintText && tradeW.mint) els.mintText.textContent = tradeW.mint.slice(0, 4) + '...' + tradeW.mint.slice(-4);
+    if (els.share && tradeW.mint) els.share.dataset.link = `https://pancakeswap.finance/swap?chain=bsc&outputCurrency=${tradeW.mint}`;
+    if (els.urlLink && tradeW.url) {
+      els.urlLink.href = tradeW.url;
+      els.urlLink.hidden = false;
+      if (els.urlText) els.urlText.textContent = tradeW.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    }
+
+    // Lend only if the traded rail is a Venus bStock wrapper.
+    if (els.lend) {
+      const canLend = tradeW.platform === 'bstocks';
+      els.lend.hidden = !canLend;
+      els.lend.href = canLend ? `/lend/${encodeURIComponent(tradeW.symbol)}` : '/lend';
+      els.bar.classList.toggle('can-lend', canLend);
+    }
+
+    renderTapeRow(g);
+    render();
+    loadChart();
+    loadAssets();
+  }
+
+  async function loadGroup() {
+    try {
+      const g = await getJSON(`/api/token/${encodeURIComponent(UNDERLYING)}`);
+      applyGroup(g);
+    } catch (err) {
+      setTimeout(loadGroup, 3000);
+    }
+  }
+
   // ---- Actions ------------------------------------------------------------
   function connect() {
     if (window.MarktapeWallet) window.MarktapeWallet.connectWithPicker();
@@ -343,8 +437,12 @@
   state.address = window.MarktapeWallet ? window.MarktapeWallet.getAddress() : null;
   render();
   measureAbout();
-  loadAssets();
-  loadChart();
+  if (IS_GROUP) {
+    loadGroup(); // resolves SYMBOL (cheapest/focused rail), then loads assets + chart
+  } else {
+    loadAssets();
+    loadChart();
+  }
   tickPrices();
   tickBalances();
   setInterval(tickPrices, PRICE_MS);
