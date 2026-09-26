@@ -2,7 +2,7 @@
 Tape = GeckoTerminal. Mark = Yahoo last cash print. Both free, no key.
 """
 from __future__ import annotations
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
@@ -10,6 +10,7 @@ USDT = "0x55d398326f99059fF775485246999027B3197955"
 WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
 NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 NY = ZoneInfo("America/New_York")
+WAT = ZoneInfo("Africa/Lagos")
 
 UNIVERSE = [
     {"underlying":"NVDA","yahoo":"NVDA","name":"NVIDIA","wrappers":[
@@ -90,7 +91,25 @@ def session_now(now=None):
         label = "AFTER-HOURS"
     else:
         label = "CASH OPEN"
-    return {"label": label, "cashOpen": label == "CASH OPEN", "ny": ny.isoformat(), "utc": now.astimezone(timezone.utc).isoformat()}
+    wat = now.astimezone(WAT)
+    utc = now.astimezone(timezone.utc)
+
+    next_close = close_t if ny < close_t else close_t + timedelta(days=1)
+    while next_close.weekday() >= 5:
+        next_close += timedelta(days=1)
+    next_close_wat = next_close.astimezone(WAT)
+    ny_close_in_sec = max(0, int((next_close - ny).total_seconds()))
+
+    return {
+        "label": label,
+        "cashOpen": label == "CASH OPEN",
+        "ny": ny.isoformat(),
+        "utc": utc.isoformat(),
+        "wat": wat.strftime("%H:%M"),
+        "et": ny.strftime("%H:%M"),
+        "nyCloseAtWat": next_close_wat.strftime("%H:%M"),
+        "nyCloseInSec": ny_close_in_sec,
+    }
 
 _snapshot_cache = {"fetchedAt": None, "session": None, "tokens": [], "groups": []}
 
