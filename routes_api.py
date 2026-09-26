@@ -76,11 +76,17 @@ def api_news():
 
 @router.get("/chart/{symbol}")
 async def get_chart(symbol: str, range: str = "1D"):
+    import rwa as _rwa
     sym, rng = symbol.upper(), range.upper()
-    if prices.get_asset(sym) is None:
-        raise HTTPException(status_code=404, detail="Unknown symbol")
     if rng not in chart.RANGES:
         raise HTTPException(status_code=400, detail="Bad range")
+    # Underlying symbol (e.g. NVDA) → multi-series response
+    if any(u["underlying"] == sym for u in _rwa.UNIVERSE):
+        data = await chart.get_multi_points(sym, rng)
+        return {"symbol": sym, "range": rng, **data}
+    # Wrapper or crypto → single-series (existing behaviour)
+    if prices.get_asset(sym) is None:
+        raise HTTPException(status_code=404, detail="Unknown symbol")
     return {"symbol": sym, "range": rng, "points": await chart.get_points(sym, rng)}
 
 

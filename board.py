@@ -207,6 +207,7 @@ async def build_snapshot():
 def _persist(rows):
     db = SessionLocal()
     try:
+        # Wrapper snapshots
         for row in rows:
             if not row.get("tokenPrice"):
                 continue
@@ -218,6 +219,21 @@ def _persist(rows):
                 platform=row.get("platform"),
                 underlying=row.get("underlying"),
             ))
+        # Cash mark snapshots — one row per underlying where we have a mark
+        seen_und = set()
+        for row in rows:
+            und = row.get("underlying")
+            mark = row.get("markPrice")
+            if und and mark and und not in seen_und:
+                seen_und.add(und)
+                db.add(PriceSnapshot(
+                    symbol=und,
+                    token_price=mark,
+                    mark_price=mark,
+                    premium=0.0,
+                    platform="cash",
+                    underlying=und,
+                ))
         db.commit()
     except Exception:
         log.warning("board: persist failed", exc_info=True)

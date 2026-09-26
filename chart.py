@@ -70,6 +70,42 @@ async def _binance_points(symbol, interval, limit):
     return []
 
 
+async def get_wrapper_points(wrapper_symbols: list, window) -> dict:
+    """Return {symbol: [[ts,px], ...]} for each wrapper from price_snapshots."""
+    if not wrapper_symbols:
+        return {}
+    cutoff = datetime.now(timezone.utc) - window
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            select(PriceSnapshot.symbol, PriceSnapshot.fetched_at, PriceSnapshot.token_price)
+            .where(
+                PriceSnapshot.symbol.in_(wrapper_symbols),
+                PriceSnapshot.fetched_at >= cutoff,
+            )
+            .order_by(PriceSnapshot.symbol.asc(), PriceSnapshot.fetched_at.asc())
+        ).all()
+    finally:
+        db.close()
+    by_sym: dict = {}
+    for sym, ts, px in rows:
+        if px:
+            by_sym.setdefault(sym, []).append((int(ts.timestamp() * 1000), float(px)))
+    return {sym: _downsample(pts) for sym, pts in by_sym.items()}
+
+
+async def get_multi_points(underlying: str, rng: str) -> dict:
+    """For group pages: returns {mark:[[ts,px]], wrappers:{SYM:[[ts,px]]}}."""
+    import rwa as _rwa
+    window, _interval, _limit = RANGES[rng]
+    # cash mark series
+    mark_pts = _stock_points(underlying, window)
+    # wrapper series
+    w_syms = [w["symbol"] for w in _rwa.wrappers() if w["underlying"] == underlying and w.get("address")]
+    wrapper_pts = await get_wrapper_points(w_syms, window)
+    return {"mark": mark_pts, "wrappers": wrapper_pts}
+
+
 async def get_points(symbol, rng):
     key = (symbol, rng)
     cached = _cache.get(key)
