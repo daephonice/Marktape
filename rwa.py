@@ -13,33 +13,39 @@ NY = ZoneInfo("America/New_York")
 
 UNIVERSE = [
     {"underlying":"NVDA","yahoo":"NVDA","name":"NVIDIA","wrappers":[
-        {"symbol":"NVDAx","platform":"xstocks","address":"0xc845b2894dBddd03858fd2D643B4eF725fE0849d"},
-        {"symbol":"NVDAon","platform":"ondo","address":"0xA9eE28C80f960B889dFbd1902055218cBa016F75"},
+        {"symbol":"NVDAx","platform":"xstocks","address":"0xc845b2894dBddd03858fd2D643B4eF725fE0849d","multiplier":None},
+        {"symbol":"NVDAon","platform":"ondo","address":"0xA9eE28C80f960B889dFbd1902055218cBa016F75","multiplier":None},
+        {"symbol":"NVDAB","platform":"bstocks","address":"0x02fca66c1d1afb4e2a7884261eb00f63598a7436","multiplier":1.0},
     ]},
     {"underlying":"TSLA","yahoo":"TSLA","name":"Tesla","wrappers":[
-        {"symbol":"TSLAx","platform":"xstocks","address":"0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0"},
-        {"symbol":"TSLAon","platform":"ondo","address":"0x2494b603319d4D9F9715c9f4496d9E0364B59d93"},
+        {"symbol":"TSLAx","platform":"xstocks","address":"0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0","multiplier":None},
+        {"symbol":"TSLAon","platform":"ondo","address":"0x2494b603319d4D9F9715c9f4496d9E0364B59d93","multiplier":None},
+        {"symbol":"TSLAB","platform":"bstocks","address":"0x5b1910eaad6450e50f816082aa078c41f10c292f","multiplier":1.0},
     ]},
     {"underlying":"AAPL","yahoo":"AAPL","name":"Apple","wrappers":[
-        {"symbol":"AAPLx","platform":"xstocks","address":"0x9d275685dC284C8eB1C79f6ABA7a63Dc75ec890a"},
-        {"symbol":"AAPLon","platform":"ondo","address":"0x390a684EF9cADE28A7AD0DFa61AB1Eb3842618c4"},
+        {"symbol":"AAPLx","platform":"xstocks","address":"0x9d275685dC284C8eB1C79f6ABA7a63Dc75ec890a","multiplier":None},
+        {"symbol":"AAPLon","platform":"ondo","address":"0x390a684EF9cADE28A7AD0DFa61AB1Eb3842618c4","multiplier":None},
+        {"symbol":"AAPLB","platform":"bstocks","address":None,"multiplier":1.0},
     ]},
     {"underlying":"META","yahoo":"META","name":"Meta","wrappers":[
-        {"symbol":"METAx","platform":"xstocks","address":"0x96702be57Cd9777f835117a809C7124fe4ec989A"},
-        {"symbol":"METAon","platform":"ondo","address":"0xD7dF5863A3e742F0c767768cDfcb63f09E0422f6"},
+        {"symbol":"METAx","platform":"xstocks","address":"0x96702be57Cd9777f835117a809C7124fe4ec989A","multiplier":None},
+        {"symbol":"METAon","platform":"ondo","address":"0xD7dF5863A3e742F0c767768cDfcb63f09E0422f6","multiplier":None},
+        {"symbol":"METAB","platform":"bstocks","address":"0x7425889fe94f9d693e8daefe88bcced6acfef4c0","multiplier":1.0},
     ]},
     {"underlying":"AMD","yahoo":"AMD","name":"AMD","wrappers":[
-        {"symbol":"AMDx","platform":"xstocks","address":"0x3522513E5F146a2006e2901b05f16B2821485E19"},
-        {"symbol":"AMDon","platform":"ondo","address":"0x9f16E46c73b43BDB70861247d537bEE4eA18F639"},
+        {"symbol":"AMDx","platform":"xstocks","address":"0x3522513E5F146a2006e2901b05f16B2821485E19","multiplier":None},
+        {"symbol":"AMDon","platform":"ondo","address":"0x9f16E46c73b43BDB70861247d537bEE4eA18F639","multiplier":None},
+        {"symbol":"AMDB","platform":"bstocks","address":"0x75fd4cf6f8392e41e70391d60c90c0d5211603a1","multiplier":1.0},
     ]},
     {"underlying":"QQQ","yahoo":"QQQ","name":"Invesco QQQ","wrappers":[
-        {"symbol":"QQQx","platform":"xstocks","address":"0xa753A7395cAe905Cd615Da0B82A53E0560f250af"},
-        {"symbol":"QQQon","platform":"ondo","address":"0x0cdE6936d305d5B34667fC46425E852efd73559a"},
+        {"symbol":"QQQx","platform":"xstocks","address":"0xa753A7395cAe905Cd615Da0B82A53E0560f250af","multiplier":None},
+        {"symbol":"QQQon","platform":"ondo","address":"0x0cdE6936d305d5B34667fC46425E852efd73559a","multiplier":None},
+        {"symbol":"QQQB","platform":"bstocks","address":"0x205812cdbed920aff76c6580abd681a46d11efc7","multiplier":1.0},
     ]},
     {"underlying":"SPCX","yahoo":None,"name":"SpaceX","wrappers":[
-        {"symbol":"SPCXx","platform":"xstocks","address":"0x68fa48b1c2fe52b3d776e1953e0e782b5044ce28"},
-        {"symbol":"SPCXon","platform":"ondo","address":"0xd0a58BC9D88D3FF48C0294Cb7e45937d0E41A928"},
-        {"symbol":"SPCXB","platform":"bstocks","address":"0xbe9d156892e55e7154bcd3cb0fea677f9d3103e1"},
+        {"symbol":"SPCXx","platform":"xstocks","address":"0x68fa48b1c2fe52b3d776e1953e0e782b5044ce28","multiplier":None},
+        {"symbol":"SPCXon","platform":"ondo","address":"0xd0a58BC9D88D3FF48C0294Cb7e45937d0E41A928","multiplier":None},
+        {"symbol":"SPCXB","platform":"bstocks","address":"0xbe9d156892e55e7154bcd3cb0fea677f9d3103e1","multiplier":1.0},
     ]},
 ]
 

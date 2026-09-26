@@ -53,7 +53,7 @@ async def _one_gecko(client, addr: str):
 
 async def _gecko_prices(client) -> dict:
     out = {}
-    addrs = [w["address"] for w in rwa.wrappers()]
+    addrs = [w["address"] for w in rwa.wrappers() if w.get("address")]
     for i in range(0, len(addrs), 5):
         chunk = addrs[i:i + 5]
         try:
@@ -113,7 +113,8 @@ async def build_snapshot():
         marks, tapes = await asyncio.gather(_yahoo_marks(client), _gecko_prices(client))
     tokens = []
     for w in rwa.wrappers():
-        tape = tapes.get(w["address"].lower()) or {}
+        has_addr = bool(w.get("address"))
+        tape = (tapes.get(w["address"].lower()) if has_addr else None) or {}
         token_price = tape.get("price")
         mark = marks.get(w["yahoo"]) if w.get("yahoo") else None
         prem = rwa.premium(token_price, mark) if token_price and mark else None
@@ -125,13 +126,16 @@ async def build_snapshot():
             "mint": w["address"],
             "address": w["address"],
             "image": tape.get("image"),
-            "tokenPrice": token_price,
+            "tokenPrice": token_price if has_addr else None,
             "markPrice": mark,
-            "premium": prem,
-            "status": rwa.premium_status(prem),
-            "description": f"{w['name']} tokenized equity on BNB Chain via {w['platform']}. Economic exposure only.",
-            "url": f"https://pancakeswap.finance/swap?chain=bsc&outputCurrency={w['address']}",
-            "multiplier": 1.0,
+            "premium": prem if has_addr else None,
+            "status": rwa.premium_status(prem) if has_addr else "flat",
+            "description": (
+                f"{w['name']} tokenized equity on BNB Chain via {w['platform']}. Economic exposure only."
+                if has_addr else f"{w['name']} has no confirmed {w['platform']} wrapper yet."
+            ),
+            "url": f"https://pancakeswap.finance/swap?chain=bsc&outputCurrency={w['address']}" if has_addr else None,
+            "multiplier": w.get("multiplier"),
         })
     tokens.sort(key=lambda t: abs(t["premium"] or 0), reverse=True)
     snap = rwa.set_cached_snapshot(tokens, _group(tokens))
