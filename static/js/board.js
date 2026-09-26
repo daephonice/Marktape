@@ -166,6 +166,24 @@
   // ---- Session chip --------------------------------------------------------
   const SESS_MS = 30000;
   const SESS_CLASS = { 'CASH OPEN': 'sess-open', 'PRE-MARKET': 'sess-pre', 'AFTER-HOURS': 'sess-ah', 'WEEKEND': 'sess-we' };
+  let lastSession = null;
+  function fmtCountdown(sec) {
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    return h > 0 ? `${h}h${m ? ' ' + m + 'm' : ''}` : `${m}m`;
+  }
+  function tickSessionSub() {
+    const sub = document.getElementById('sess-sub');
+    const s = lastSession;
+    if (!sub || !s) return;
+    if (s.cashOpen && typeof s.nyCloseInSec === 'number') {
+      sub.textContent = `Close in ${fmtCountdown(s.nyCloseInSec)} · ${s.wat} WAT`;
+      s.nyCloseInSec = Math.max(0, s.nyCloseInSec - 1);
+    } else if (s.nyCloseAtWat) {
+      sub.textContent = `NY close ${s.nyCloseAtWat} WAT`;
+    } else {
+      sub.textContent = s.wat ? `${s.wat} WAT` : '';
+    }
+  }
   async function refreshSession() {
     const chip = document.getElementById('sess-chip');
     const label = document.getElementById('sess-label');
@@ -176,12 +194,15 @@
       const s = await resp.json();
       label.textContent = s.label;
       chip.className = 'sess-chip ' + (SESS_CLASS[s.label] || 'sess-we');
+      lastSession = s;
+      tickSessionSub();
     } catch (err) {
       console.warn('session refresh failed', err);
     }
   }
   refreshSession();
   setInterval(refreshSession, SESS_MS);
+  setInterval(tickSessionSub, 60000);
 
   loadAllSparklines();
 })();

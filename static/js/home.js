@@ -41,6 +41,7 @@
     hldDisc: $('hld-disc'),
     sessChip: $('sess-chip'),
     sessLabel: $('sess-label'),
+    sessSub: $('sess-sub'),
   };
 
   const state = {
@@ -518,10 +519,29 @@
 
   // ---- Session chip --------------------------------------------------------
   const SESS_CLASS = { 'CASH OPEN': 'sess-open', 'PRE-MARKET': 'sess-pre', 'AFTER-HOURS': 'sess-ah', 'WEEKEND': 'sess-we' };
+  let sessCountdownTimer = null;
+  function fmtCountdown(sec) {
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    return h > 0 ? `${h}h${m ? ' ' + m + 'm' : ''}` : `${m}m`;
+  }
+  function tickSessionSub() {
+    const s = state.session;
+    if (!s || !els.sessSub) return;
+    if (s.cashOpen && typeof s.nyCloseInSec === 'number') {
+      els.sessSub.textContent = `Close in ${fmtCountdown(s.nyCloseInSec)} · ${s.wat} WAT`;
+      s.nyCloseInSec = Math.max(0, s.nyCloseInSec - 1);
+    } else if (s.nyCloseAtWat) {
+      els.sessSub.textContent = `NY close ${s.nyCloseAtWat} WAT`;
+    } else {
+      els.sessSub.textContent = s.wat ? `${s.wat} WAT` : '';
+    }
+  }
   function renderSession() {
     if (!els.sessChip || !state.session) return;
     els.sessLabel.textContent = state.session.label;
     els.sessChip.className = 'sess-chip ' + (SESS_CLASS[state.session.label] || 'sess-we');
+    tickSessionSub();
+    if (!sessCountdownTimer) sessCountdownTimer = setInterval(tickSessionSub, 60000);
   }
 
   // ---- Render orchestration -----------------------------------------------
