@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Lend — Marktape{% endblock %}
+{% block title %}Lend — StreetTape{% endblock %}
 {% block viewport %}width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover{% endblock %}
 {% block body_class %}hm tk lend-page{% endblock %}
 
@@ -25,8 +25,8 @@
 {% block content %}
 <div class="tk-wrap" id="lend-page" data-symbol="{{ lend_symbol or '' }}">
   <div class="hm-col lend-col" id="lend-markets">
-    <p class="lend-pitch">Park a PreStock. Borrow USDC or SOL. Don’t sell the name.</p>
-    <span class="lend-pill">Demo market · not live on PreStocks</span>
+    <p class="lend-pitch">Park a tokenized stock. Borrow USDC or BNB. Don’t sell the name.</p>
+    <span class="lend-pill">Demo market · demo book · not a live Venus vault</span>
 
     <div class="lend-stats" id="lend-stats">
       <div><small>Protocol TVL</small><b id="lend-tvl">—</b></div>
@@ -42,7 +42,7 @@
     <div class="lend-filters" id="lend-filters">
       <button type="button" class="lend-chip on" data-debt="ALL">All</button>
       <button type="button" class="lend-chip" data-debt="USDC">USDC</button>
-      <button type="button" class="lend-chip" data-debt="SOL">SOL</button>
+      <button type="button" class="lend-chip" data-debt="BNB">BNB</button>
     </div>
 
     <div id="lend-market-list" class="lend-list"></div>
@@ -56,7 +56,7 @@
       </div>
     </section>
 
-    <p class="lend-foot">Economic exposure only. Not shares, not for US persons. Mock book — Marktape does not custody funds.</p>
+    <p class="lend-foot">Economic exposure only. Not shares, not for US persons. Mock book — StreetTape does not custody funds.</p>
   </div>
 
   <div class="hm-col lend-col" id="lend-vault" hidden>
@@ -70,7 +70,7 @@
       </div>
       <div class="lend-debt-toggle" id="debt-toggle">
         <button type="button" class="lend-chip" data-debt="USDC">USDC</button>
-        <button type="button" class="lend-chip" data-debt="SOL">SOL</button>
+        <button type="button" class="lend-chip" data-debt="BNB">BNB</button>
       </div>
     </div>
 

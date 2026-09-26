@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ token.symbol }} — Marktape{% endblock %}
+{% block title %}{{ token.symbol }} — StreetTape{% endblock %}
 {% block body_class %}hm tk{% endblock %}
 
 {% block header %}
@@ -20,7 +20,7 @@
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
       </button>
     </div>
-    <button class="tk-share" id="tk-share" type="button" data-link="https://jup.ag/tokens/{{ token.mint }}" aria-label="Share">
+    <button class="tk-share" id="tk-share" type="button" data-link="https://pancakeswap.finance/swap?chain=bsc&outputCurrency={{ token.mint }}" aria-label="Share">
       <svg class="tk-share-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/></svg>
       <span class="tk-share-done">Copied</span>
     </button>
@@ -81,7 +81,7 @@
 
   <section class="tk-about" id="tk-about">
     <h2>About {{ token.name }}</h2>
-    <p class="tk-about-text" id="tk-about-text">{{ token.description or (token.name ~ ' is a PreStocks token that gives economic exposure only — no ownership, voting or other legal rights.') }}</p>
+    <p class="tk-about-text" id="tk-about-text">{{ token.description or (token.name ~ ' is a BNB Chain tokenized equity. Economic exposure only — no ownership, voting or other legal rights.') }}</p>
     <button class="tk-readmore" id="tk-readmore" type="button" hidden><span>Read More</span><svg width="16" height="16"><use href="#i-chevron-down"/></svg></button>
     {% if telegram_bot_url and token.symbol not in ('USDC', 'USDT') %}
     <a class="tk-link tk-tg-link" href="{{ telegram_bot_url }}?start={{ token.symbol }}" target="_blank" rel="noopener noreferrer">
@@ -97,7 +97,7 @@
     {% endif %}
   </section>
 
-  <p class="tk-legal">Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. Marktape does not custody funds.</p>
+  <p class="tk-legal">Economic exposure only. Not shares, not for US persons, not advice. Swaps sign in your wallet. StreetTape does not custody funds.</p>
 </div>
 
 <div class="tk-bar only-buy" id="tk-bar">
