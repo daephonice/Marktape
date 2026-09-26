@@ -60,6 +60,21 @@
     return trunc(v, v >= 1000 ? 2 : v >= 1 ? 4 : 8);
   }
 
+  // Returns multiplier for a symbol from assets, or null.
+  function multiplierOf(c, sym) {
+    const m = (c.assets[sym] || {}).multiplier;
+    return (m > 0) ? m : null;
+  }
+
+  // Convert user-typed shares to tokens (if m set), else tokens = raw number.
+  // On the buy side the user always types the pay-currency amount (BNB/USDC),
+  // not shares; multiplier only affects the output label on received tokens.
+  // For sell side: user works in token %, so multiplier only affects the est label.
+  function tokensToShares(tokens, m) {
+    if (!(m > 0) || !(tokens > 0)) return null;
+    return tokens * m;
+  }
+
   function sanitize(str, maxDec) {
     str = str.replace(',', '.').replace(/[^\d.]/g, '');
     const i = str.indexOf('.');
@@ -327,9 +342,14 @@
       else if (S.quoting) setCta('Getting price...', true, true);
       else if (!S.order || !S.order.uiOutAmount) setCta(`Buy with ${S.raw.replace(/\.$/, '')} ${S.cur}`, true);
       else setCta(`Buy with ${S.raw.replace(/\.$/, '')} ${S.cur}`, false);
-      R.est.textContent = d.v > 0 && d.out > 0
-        ? `You will receive ~${fmtTok(d.out)} ${S.symbol} ≈ ${usdFmt.format(d.usdIn)}`
-        : `You will receive in ${S.symbol}`;
+      if (d.v > 0 && d.out > 0) {
+        const m = multiplierOf(c, S.symbol);
+        const shares = tokensToShares(d.out, m);
+        const sharesStr = shares !== null ? ` × ${m} ≈ ${fmtTok(shares)} shares` : '';
+        R.est.textContent = `~${fmtTok(d.out)} tokens${sharesStr} ≈ ${usdFmt.format(d.usdIn)}`;
+      } else {
+        R.est.textContent = `You will receive in ${S.symbol}`;
+      }
     } else {
       const d = sellCalc(c);
       R.bal.textContent = `Balance: ${trunc(d.bal, TOKEN_DEC)} ${S.symbol}`;
@@ -344,9 +364,14 @@
       else if (S.quoting) setCta('Getting price...', true, true);
       else if (!S.order || !S.order.uiOutAmount) setCta(`Sell ${trunc(d.amt, TOKEN_DEC)} ${S.symbol}`, true);
       else setCta(`Sell ${trunc(d.amt, TOKEN_DEC)} ${S.symbol}`, false);
-      R.est.textContent = d.amt > 0 && d.out > 0
-        ? `You will receive ~${fmtTok(d.out)} ${S.cur} ≈ ${usdFmt.format(d.usdOut)}`
-        : `You will receive in ${S.cur}`;
+      if (d.amt > 0 && d.out > 0) {
+        const m = multiplierOf(c, S.symbol);
+        const shares = tokensToShares(d.amt, m);
+        const sharesStr = shares !== null ? ` (${fmtTok(shares)} shares)` : '';
+        R.est.textContent = `Selling ${fmtTok(d.amt)} tokens${sharesStr} → ~${fmtTok(d.out)} ${S.cur} ≈ ${usdFmt.format(d.usdOut)}`;
+      } else {
+        R.est.textContent = `You will receive in ${S.cur}`;
+      }
     }
   }
 

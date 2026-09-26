@@ -450,7 +450,19 @@
 
     const sellPrice = (c.prices[S.sell] || {}).price || 0;
     const sellAmt = parseFloat(S.sellRaw) || 0;
-    R.subSell.textContent = sellAmt > 0 && sellPrice > 0 ? fmtUsd(sellAmt * sellPrice) : '';
+    // Sell sub: USD value + shares note when selling a stock token
+    if (sellAmt > 0 && sellPrice > 0) {
+      const mSell = ((c.assets[S.sell] || {}).multiplier) || null;
+      const sellUsd = fmtUsd(sellAmt * sellPrice);
+      if (mSell > 0) {
+        const shares = sellAmt * mSell;
+        R.subSell.textContent = `${sellAmt} tokens \u00d7 ${mSell} \u2248 ${fmtAmount(shares)} shares \u2014 ${sellUsd}`;
+      } else {
+        R.subSell.textContent = sellUsd;
+      }
+    } else {
+      R.subSell.textContent = '';
+    }
 
     if (S.quoting) {
       R.outBuy.textContent = '';
@@ -463,8 +475,14 @@
     const outUi = S.order ? S.order.uiOutAmount : 0;
     let subBuy = '';
     if (outUi > 0 && buyPrice > 0) {
-      subBuy = fmtUsd(outUi * buyPrice);
-      if (sellAmt > 0 && sellPrice > 0) {
+      const mBuy = ((c.assets[S.buy] || {}).multiplier) || null;
+      if (mBuy > 0) {
+        const shares = outUi * mBuy;
+        subBuy = `${fmtAmount(outUi)} tokens \u00d7 ${mBuy} \u2248 ${fmtAmount(shares)} shares`;
+      } else {
+        subBuy = fmtUsd(outUi * buyPrice);
+      }
+      if (sellAmt > 0 && sellPrice > 0 && !(mBuy > 0)) {
         const inUsd = sellAmt * sellPrice;
         const outUsd = outUi * buyPrice;
         if (inUsd > 0) {

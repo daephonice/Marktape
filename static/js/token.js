@@ -75,6 +75,13 @@
     return (v < 0 ? '-' : v > 0 ? '+' : '') + '$' + abs.toFixed(digits);
   }
 
+  // Returns "X tokens × M ≈ Y shares" when multiplier is set, else null.
+  function sharesNote(tokens, multiplier) {
+    if (!(multiplier > 0) || !(tokens > 0)) return null;
+    const shares = tokens * multiplier;
+    return `${fmtAmount(tokens)} tokens \u00d7 ${multiplier} \u2248 ${fmtAmount(shares)} shares`;
+  }
+
   function pct(p, digits) {
     if (p === null || p === undefined || !isFinite(p)) return null;
     const r = Number(p.toFixed(digits === undefined ? 1 : digits));
@@ -127,7 +134,10 @@
     els.bar.classList.toggle('only-buy', !held);
     if (held) {
       els.posVal.textContent = fmtUsd(amount * p.price);
-      els.posAmt.textContent = `${fmtAmount(amount)} ${SYMBOL}`;
+      const assetMeta = state.assets[SYMBOL] || {};
+      const m = assetMeta.multiplier || null;
+      const note = sharesNote(amount, m);
+      els.posAmt.textContent = note || `${fmtAmount(amount)} ${SYMBOL}`;
       const delta = amount * (p.price - open24h(p)); // 24h move of the position
       const pi = pct(p.change24h);
       els.posDelta.textContent = fmtDelta(delta);
