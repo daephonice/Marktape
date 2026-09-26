@@ -1,95 +1,176 @@
-"""Assembles the board snapshot: PreStocks records -> multiplier-corrected
-rows -> sorted by absolute premium desc. Runs a background refresh loop
-(30-60s) started from main.py, same shape as the casino's price/game tasks.
-Also persists rows into PriceSnapshot for the 24-72h sparkline (P3).
-"""
+"""StreetTape board: Yahoo mark + GeckoTerminal tape."""
+from __future__ import annotations
+
 import os
 import asyncio
 import logging
 
 import httpx
 
-import prestocks
-import multiplier as multiplier_mod
-import jupiter
+import rwa
 from database import SessionLocal
 from models import PriceSnapshot
 
 log = logging.getLogger("board")
-
 REFRESH_SECONDS = int(os.getenv("BOARD_REFRESH_SECONDS", "45"))
+GECKO = "https://api.geckoterminal.com/api/v2"
+YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart"
+HEADERS = {"User-Agent": "StreetTape/1.0", "Accept": "application/json"}
+_task = None
 
-_task: asyncio.Task | None = None
 
-
-async def build_snapshot() -> dict:
-    async with httpx.AsyncClient(timeout=10) as client:
+async def _yahoo_marks(client: httpx.AsyncClient) -> dict:
+    out = {}
+    tickers = sorted({u["yahoo"] for u in rwa.UNIVERSE if u.get("yahoo")})
+    for tkr in tickers:
         try:
-            records = await prestocks.fetch_prestocks(client)
+            resp = await client.get(f"{YAHOO}/{tkr}", params={"interval": "1d", "range": "5d"})
+            resp.raise_for_status()
+            result = (resp.json().get("chart") or {}).get("result") or []
+            if not result:
+                continue
+            meta = result[0].get("meta") or {}
+            px = meta.get("regularMarketPrice") or meta.get("chartPreviousClose") or meta.get("previousClose")
+            if px:
+                out[tkr] = float(px)
         except Exception:
-            log.warning("board: PreStocks fetch failed, keeping last-good snapshot", exc_info=True)
-            return prestocks.get_cached_snapshot()
+            log.warning("board: yahoo %s failed", tkr, exc_info=True)
+        await asyncio.sleep(0.12)
+    return out
 
-        async def _row(r):
-            mint = r["contract_address"]
+
+async def _one_gecko(client, addr: str):
+    resp = await client.get(f"{GECKO}/networks/bsc/tokens/{addr}")
+    if resp.status_code == 429:
+        await asyncio.sleep(2)
+        resp = await client.get(f"{GECKO}/networks/bsc/tokens/{addr}")
+    if resp.status_code != 200:
+        return None
+    attr = resp.json()["data"]["attributes"]
+    px = attr.get("price_usd")
+    return {"price": float(px) if px else None, "image": attr.get("image_url")}
+
+
+async def _gecko_prices(client) -> dict:
+    out = {}
+    addrs = [w["address"] for w in rwa.wrappers()]
+    for i in range(0, len(addrs), 5):
+        chunk = addrs[i:i + 5]
+        try:
+            resp = await client.get(f"{GECKO}/networks/bsc/tokens/multi/{','.join(chunk)}")
+            if resp.status_code == 200:
+                data = resp.json().get("data") or []
+                if isinstance(data, dict):
+                    data = [data]
+                for item in data:
+                    attr = item.get("attributes") or {}
+                    addr = (attr.get("address") or "").lower()
+                    px = attr.get("price_usd")
+                    out[addr] = {"price": float(px) if px else None, "image": attr.get("image_url")}
+                await asyncio.sleep(0.2)
+                continue
+        except Exception:
+            log.info("board: gecko multi miss", exc_info=True)
+        for a in chunk:
             try:
-                m = await multiplier_mod.get_mint_multiplier(mint, client)
-                mult = m["multiplier"]
+                row = await _one_gecko(client, a)
+                if row:
+                    out[a.lower()] = row
             except Exception:
-                mult = 1.0
-            return prestocks.normalize_row(r, multiplier=mult)
-
-        rows = await asyncio.gather(*(_row(r) for r in records))
-
-        # Best-effort executable price overlay — never blocks the board.
-        try:
-            mint_ids = [row["mint"] for row in rows]
-            prices = await jupiter.get_prices(mint_ids, client)
-            for row in rows:
-                p = prices.get(row["mint"]) if isinstance(prices, dict) else None
-                if p and isinstance(p, dict) and p.get("usdPrice"):
-                    exec_price = float(p["usdPrice"])
-                    row["execPrice"] = exec_price
-                    if row["tokenPrice"]:
-                        row["divergence"] = exec_price / row["tokenPrice"] - 1
-        except Exception:
-            log.info("board: jupiter price overlay skipped", exc_info=True)
-
-        rows.sort(key=lambda t: abs(t["premium"] or 0), reverse=True)
-
-    snapshot = prestocks.set_cached_snapshot(rows)
-    _persist_snapshot_rows(rows)
-    return snapshot
+                log.info("board: gecko %s skipped", a, exc_info=True)
+            await asyncio.sleep(0.2)
+    return out
 
 
-def _persist_snapshot_rows(rows: list[dict]) -> None:
+def _group(tokens):
+    by = {}
+    for t in tokens:
+        by.setdefault(t["underlying"], []).append(t)
+    groups = []
+    for und, rows in by.items():
+        priced = [r for r in rows if r.get("tokenPrice")]
+        cheapest = min(priced, key=lambda r: r["tokenPrice"]) if priced else None
+        richest = max(priced, key=lambda r: r["tokenPrice"]) if priced else None
+        groups.append({
+            "underlying": und,
+            "name": rows[0]["name"],
+            "markPrice": rows[0].get("markPrice"),
+            "wrappers": rows,
+            "cheapest": cheapest["symbol"] if cheapest else None,
+            "richest": richest["symbol"] if richest else None,
+            "crossSpread": (
+                (richest["tokenPrice"] / cheapest["tokenPrice"] - 1)
+                if cheapest and richest and cheapest["tokenPrice"] else None
+            ),
+            "absPremium": max((abs(r["premium"] or 0) for r in rows), default=0),
+        })
+    groups.sort(key=lambda g: g["absPremium"], reverse=True)
+    return groups
+
+
+async def build_snapshot():
+    async with httpx.AsyncClient(timeout=12, headers=HEADERS) as client:
+        marks, tapes = await asyncio.gather(_yahoo_marks(client), _gecko_prices(client))
+    tokens = []
+    for w in rwa.wrappers():
+        tape = tapes.get(w["address"].lower()) or {}
+        token_price = tape.get("price")
+        mark = marks.get(w["yahoo"]) if w.get("yahoo") else None
+        prem = rwa.premium(token_price, mark) if token_price and mark else None
+        tokens.append({
+            "symbol": w["symbol"],
+            "name": w["name"],
+            "underlying": w["underlying"],
+            "platform": w["platform"],
+            "mint": w["address"],
+            "address": w["address"],
+            "image": tape.get("image"),
+            "tokenPrice": token_price,
+            "markPrice": mark,
+            "premium": prem,
+            "status": rwa.premium_status(prem),
+            "description": f"{w['name']} tokenized equity on BNB Chain via {w['platform']}. Economic exposure only.",
+            "url": f"https://pancakeswap.finance/swap?chain=bsc&outputCurrency={w['address']}",
+            "multiplier": 1.0,
+        })
+    tokens.sort(key=lambda t: abs(t["premium"] or 0), reverse=True)
+    snap = rwa.set_cached_snapshot(tokens, _group(tokens))
+    _persist(tokens)
+    return snap
+
+
+def _persist(rows):
     db = SessionLocal()
     try:
         for row in rows:
+            if not row.get("tokenPrice"):
+                continue
             db.add(PriceSnapshot(
                 symbol=row["symbol"],
                 token_price=row["tokenPrice"],
-                mark_price=row["markPrice"],
-                premium=row["premium"],
+                mark_price=row.get("markPrice") or 0.0,
+                premium=row.get("premium"),
+                platform=row.get("platform"),
+                underlying=row.get("underlying"),
             ))
         db.commit()
     except Exception:
-        log.warning("board: failed to persist snapshot rows", exc_info=True)
+        log.warning("board: persist failed", exc_info=True)
         db.rollback()
     finally:
         db.close()
 
 
-async def _refresh_loop():
+async def _loop():
     while True:
         try:
             await build_snapshot()
         except Exception:
-            log.exception("board: refresh loop iteration failed")
+            log.exception("board: refresh failed")
         await asyncio.sleep(REFRESH_SECONDS)
 
 
-def start_board_refresh_task() -> None:
+def start_board_refresh_task():
     global _task
     if _task is None or _task.done():
-        _task = asyncio.create_task(_refresh_loop())
+        _task = asyncio.create_task(_loop())

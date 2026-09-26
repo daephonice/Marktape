@@ -1,4 +1,4 @@
-"""Shared hourly news for the 8 PreStocks tokens.
+"""Shared hourly news for the 8 tokenized stocks tokens.
 
 One background task fetches fresh headlines at the top of every UTC hour
 (00:00, 01:00, ... 23:00) and stores them in `news_items`. /api/news reads
@@ -30,7 +30,7 @@ GOOGLE_RSS = "https://news.google.com/rss/search"
 GDELT_DOC = "https://api.gdeltproject.org/api/v2/doc/doc"
 MAX_AGE_DAYS = 14
 KEEP_PER_SYMBOL = 10
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MarktapeNews/1.0)", "Accept": "*/*"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StreetTapeNews/1.0)", "Accept": "*/*"}
 
 _cache: list[dict] = []
 _task: asyncio.Task | None = None
@@ -172,7 +172,7 @@ def _store(sym: str, found: dict) -> bool:
 
 
 def _load_cache() -> None:
-    """Latest row per current PreStocks symbol, in board order."""
+    """Latest row per current tokenized stocks symbol, in board order."""
     global _cache
     symbols = [s for s, _ in _stock_list()]
     if not symbols:
@@ -210,7 +210,7 @@ async def refresh() -> None:
 
 
 async def _loop() -> None:
-    for _ in range(20):  # wait for the price task to know the 8 tokens
+    for _ in range(20):  # wait for the price task to know listed names
         await prices.wait_ready(5.0)
         if _stock_list():
             break

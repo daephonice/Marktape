@@ -1,24 +1,21 @@
 import logging
 import time
 
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    force=True,
-)
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s", force=True)
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
 from database import engine, Base
-import models  # noqa: F401 - registers models before create_all
+import models  # noqa: F401
 import routes_pages
 import routes_api
 import board
 import prices
 import news
 import telegram_bot
+import agent
 
 
 def init_db(retries: int = 8, delay: int = 2):
@@ -33,10 +30,8 @@ def init_db(retries: int = 8, delay: int = 2):
 
 
 init_db()
-
-app = FastAPI(title="Marktape")
+app = FastAPI(title="StreetTape")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 app.include_router(routes_pages.router)
 app.include_router(routes_api.router)
 
@@ -47,3 +42,4 @@ async def _start_background_tasks():
     prices.start_price_task()
     news.start_news_task()
     telegram_bot.start_telegram_bot_task()
+    agent.start_agent_task()

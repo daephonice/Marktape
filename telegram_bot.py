@@ -1,11 +1,11 @@
-"""Marktape Telegram bot — optional second door onto the same board data.
+"""StreetTape Telegram bot — optional second door onto the same board data.
 Runs as a background asyncio task inside the FastAPI process (started from
 main.py's startup event, same pattern as Daephon Casino's telegram_bot).
 
 Commands (spec §2.2):
   /start [SYMBOL]   3-line pitch + site link. With a payload, show that card.
   /board            Compact list of every symbol: SYMBOL  premium%  tape vs mark
-  /t SYMBOL | /symbol   Full card + site link + Jupiter link
+  /t SYMBOL | /symbol   Full card + site link + PancakeSwap link
   /watch SYMBOL     Persist chat_id+symbol (max 5 per chat)
   /unwatch SYMBOL   Remove
   /watches          List this chat's watches
@@ -29,7 +29,7 @@ from aiogram.client.default import DefaultBotProperties
 from sqlalchemy import select
 
 import news
-import prestocks
+import rwa
 import prices
 from database import SessionLocal
 from models import Watch
@@ -38,7 +38,7 @@ log = logging.getLogger("telegram_bot")
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 WEB_PUBLIC_URL = os.getenv("WEB_PUBLIC_URL", "").rstrip("/")
-JUPITER_DEEP_BASE = "https://jup.ag/swap"
+PANCAKE_BASE = "https://pancakeswap.finance/swap"
 
 router = Router()
 
@@ -46,23 +46,23 @@ MAX_WATCHES_PER_CHAT = 5
 
 
 def _row_for(symbol: str) -> dict | None:
-    snap = prestocks.get_cached_snapshot()
+    snap = rwa.get_cached_snapshot()
     symbol_u = symbol.upper().lstrip("/")
     return next((t for t in snap.get("tokens", []) if t["symbol"].upper() == symbol_u), None)
 
 
 def _resolve_symbol(text: str) -> str | None:
-    """Name or ticker -> canonical symbol among the 8 PreStocks + SOL, or None."""
+    """Name or ticker -> canonical symbol among the 8 tokenized stocks + BNB, or None."""
     text_u = text.strip().upper().lstrip("/")
     if not text_u:
         return None
-    if text_u == "SOL":
-        return "SOL"
+    if text_u == "BNB":
+        return "BNB"
     row = _row_for(text_u)
     if row:
         return row["symbol"].upper()
     # fall back to matching by name
-    snap = prestocks.get_cached_snapshot()
+    snap = rwa.get_cached_snapshot()
     for t in snap.get("tokens", []):
         if (t.get("name") or "").strip().upper() == text_u:
             return t["symbol"].upper()
@@ -70,7 +70,7 @@ def _resolve_symbol(text: str) -> str | None:
 
 
 def _card_text(row: dict) -> str:
-    pct = prestocks.format_premium(row["premium"])
+    pct = rwa.format_premium(row["premium"])
     return (
         f"<b>{row['symbol']}</b> — {row.get('name', '')}\n"
         f"{pct} vs mark\n"
@@ -80,16 +80,16 @@ def _card_text(row: dict) -> str:
 
 
 def _board_line(row: dict) -> str:
-    pct = prestocks.format_premium(row["premium"])
+    pct = rwa.format_premium(row["premium"])
     return f"{row['symbol']:<10} {pct:>7}   ${row['tokenPrice']:.2f} vs ${row['markPrice']:.2f}"
 
 
 def _live_rows() -> list[dict]:
-    """One row per PreStock for the /start live board: symbol, tape price,
+    """One row per tokenized stock for the /start live board: symbol, tape price,
     24h% (falls back to premium if 24h change isn't available yet), sorted
     stable by market cap desc (falls back to the snapshot's existing
     premium-desc order when mc isn't available)."""
-    snap = prestocks.get_cached_snapshot()
+    snap = rwa.get_cached_snapshot()
     tokens = snap.get("tokens", [])
     if not tokens:
         return []
@@ -152,39 +152,39 @@ def _live_line(row: dict, watched: set[str]) -> str:
         sign = "+" if row["change24h"] > 0 else ""
         pct = f"{sign}{row['change24h']:.1f}%"
     else:
-        pct = prestocks.format_premium(row["premium"])
+        pct = rwa.format_premium(row["premium"])
     return f"{mark}{row['symbol']:<10} {price:>10}   {pct:>7}"
 
 
-def _sol_line(watched: set[str]) -> str | None:
+def _bnb_line(watched: set[str]) -> str | None:
     live = prices.get_prices()
-    sol = (live or {}).get("prices", {}).get("SOL")
+    sol = (live or {}).get("prices", {}).get("BNB")
     if not sol or sol.get("price") is None:
         return None
-    mark = "👁" if "SOL" in watched else " "
+    mark = "👁" if "BNB" in watched else " "
     price = f"${sol['price']:.2f}"
     chg = sol.get("change24h")
     pct = f"{'+' if chg and chg > 0 else ''}{chg:.1f}%" if chg is not None else "—"
-    return f"{mark}{'SOL':<10} {price:>10}   {pct:>7}"
+    return f"{mark}{'BNB':<10} {price:>10}   {pct:>7}"
 
 
 def _live_board_text(rows: list[dict], chat_id: int | None = None, watched: set[str] | None = None) -> str:
     if watched is None:
         watched = _watched_symbols(chat_id)
     lines = [_live_line(r, watched) for r in rows]
-    sol_line = _sol_line(watched)
-    if sol_line:
-        lines.append(sol_line)
+    bnb_line = _bnb_line(watched)
+    if bnb_line:
+        lines.append(bnb_line)
     body = "\n".join(lines)
-    return f"<b>Marktape — live board</b>\n<code>{body}</code>"
+    return f"<b>StreetTape — live board</b>\n<code>{body}</code>"
 
 
 def _live_board_markup(rows: list[dict]) -> InlineKeyboardMarkup:
-    """2 cols x 4 rows of PreStock symbols (same order as the price list),
-    plus SOL full-width as the CTA row. tok:SYMBOL opens that token's menu."""
+    """2 cols x 4 rows of tokenized stock symbols (same order as the price list),
+    plus BNB full-width as the CTA row. tok:SYMBOL opens that token's menu."""
     buttons = [InlineKeyboardButton(text=r["symbol"], callback_data=f"tok:{r['symbol']}") for r in rows]
     kb: list[list[InlineKeyboardButton]] = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
-    kb.append([InlineKeyboardButton(text="SOL", callback_data="tok:SOL")])
+    kb.append([InlineKeyboardButton(text="BNB", callback_data="tok:BNB")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
@@ -250,14 +250,14 @@ def _token_menu_text(symbol: str, chat_id: int | None = None) -> str | None:
     watching = _is_watching(chat_id, symbol_u) if chat_id is not None else False
     prefix = "Watching 👁️ " if watching else ""
 
-    if symbol_u == "SOL":
+    if symbol_u == "BNB":
         live = prices.get_prices()
-        sol = (live or {}).get("prices", {}).get("SOL")
-        asset = prices.get_asset("SOL")
+        sol = (live or {}).get("prices", {}).get("BNB")
+        asset = prices.get_asset("BNB")
         if not sol or not asset:
             return None
         price = f"${sol['price']:.2f}" if sol.get("price") is not None else "—"
-        lines = [f"<b>{prefix}SOL</b> — {asset['name']}", f"Tape {price}"]
+        lines = [f"<b>{prefix}BNB</b> — {asset['name']}", f"Tape {price}"]
         if asset.get("description"):
             lines.append(f"\n{asset['description']}")
         return "\n".join(lines)
@@ -266,7 +266,7 @@ def _token_menu_text(symbol: str, chat_id: int | None = None) -> str | None:
     asset = prices.get_asset(symbol_u)
     if not row or not asset:
         return None
-    pct = prestocks.format_premium(row["premium"])
+    pct = rwa.format_premium(row["premium"])
     lines = [
         f"<b>{prefix}{row['symbol']}</b> — {row.get('name', '')}",
         f"Tape ${row['tokenPrice']:.2f} · Mark ${row['markPrice']:.2f} · {pct}",
@@ -278,8 +278,8 @@ def _token_menu_text(symbol: str, chat_id: int | None = None) -> str | None:
     if item:
         lines.append(f"\n📰 {item['body']}")
 
-    jup_link = f"{JUPITER_DEEP_BASE}/{prestocks.USDC_MINT}-{row['mint']}"
-    lines.append(f"\nCHECK ON JUPITER\n{jup_link}")
+    jup_link = f"{PANCAKE_BASE}?chain=bsc&inputCurrency=USDT&outputCurrency={row['mint']}"
+    lines.append(f"\nSWAP ON PANCAKESWAP\n{jup_link}")
     return "\n".join(lines)
 
 
@@ -290,8 +290,8 @@ def _token_menu_markup(chat_id: int, symbol: str) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=watch_label, callback_data=f"watch:{symbol_u}"),
         InlineKeyboardButton(text="Unwatch ❌", callback_data=f"unwatch:{symbol_u}"),
     ]]
-    if symbol_u != "SOL":
-        kb.append([InlineKeyboardButton(text="Open on Marktape", url=f"{WEB_PUBLIC_URL}/t/{symbol_u}")])
+    if symbol_u != "BNB":
+        kb.append([InlineKeyboardButton(text="Open on StreetTape", url=f"{WEB_PUBLIC_URL}/t/{symbol_u}")])
     kb.append([InlineKeyboardButton(text="◀ Back", callback_data="back:board")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -321,7 +321,7 @@ async def on_back(callback: CallbackQuery):
     rows = _live_rows()
     if rows:
         text = (
-            "Marktape — mark vs tape for PreStocks.\n"
+            "StreetTape — mark vs tape for tokenized stocks.\n"
             "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n\n"
         ) + _live_board_text(rows, chat_id)
         markup = _live_board_markup(rows)
@@ -390,7 +390,7 @@ async def on_start(message: Message, command: CommandObject):
             return
 
     text = (
-        "Marktape — mark vs tape for PreStocks.\n"
+        "StreetTape — mark vs tape for tokenized stocks.\n"
         "We show where the onchain price and the issuer mark disagree, and let you trade the gap.\n\n"
     )
     rows = _live_rows()
@@ -408,7 +408,7 @@ async def on_start(message: Message, command: CommandObject):
 
 @router.message(Command("board"))
 async def on_board(message: Message):
-    snap = prestocks.get_cached_snapshot()
+    snap = rwa.get_cached_snapshot()
     tokens = snap.get("tokens", [])
     if not tokens:
         await message.answer("Board is warming up — try again in a moment.")
@@ -428,8 +428,8 @@ async def on_t(message: Message, command: CommandObject):
     if not row:
         await message.answer(f"Unknown symbol: {symbol}")
         return
-    jup_link = f"{JUPITER_DEEP_BASE}/{prestocks.USDC_MINT}-{row['mint']}"
-    text = _card_text(row) + f"\nTrade: {WEB_PUBLIC_URL}/t/{row['symbol']}#swap\nJupiter: {jup_link}"
+    jup_link = f"{PANCAKE_BASE}?chain=bsc&inputCurrency=USDT&outputCurrency={row['mint']}"
+    text = _card_text(row) + f"\nTrade: {WEB_PUBLIC_URL}/t/{row['symbol']}#swap\nPancakeSwap: {jup_link}"
     await message.answer(text, disable_web_page_preview=True)
 
 
@@ -502,8 +502,8 @@ async def on_symbol_shortcut(message: Message):
     row = _row_for(symbol)
     if not row:
         return
-    jup_link = f"{JUPITER_DEEP_BASE}/{prestocks.USDC_MINT}-{row['mint']}"
-    reply = _card_text(row) + f"\nTrade: {WEB_PUBLIC_URL}/t/{row['symbol']}#swap\nJupiter: {jup_link}"
+    jup_link = f"{PANCAKE_BASE}?chain=bsc&inputCurrency=USDT&outputCurrency={row['mint']}"
+    reply = _card_text(row) + f"\nTrade: {WEB_PUBLIC_URL}/t/{row['symbol']}#swap\nPancakeSwap: {jup_link}"
     await message.answer(reply, disable_web_page_preview=True)
 
 
@@ -520,10 +520,10 @@ _last_digest_minute: int = -1
 
 
 def _digest_symbol_order() -> list[str]:
-    """Same order as the start board (mc desc), SOL last."""
+    """Same order as the start board (mc desc), BNB last."""
     rows = _live_rows()
     order = [r["symbol"].upper() for r in rows]
-    order.append("SOL")
+    order.append("BNB")
     return order
 
 
@@ -726,6 +726,23 @@ async def _polling_loop():
         except Exception:
             log.exception("telegram_bot: polling loop crashed, restarting in 10s")
         await asyncio.sleep(10)
+
+
+
+_bot_ref = None
+
+async def send_alert(chat_id: int, text: str) -> None:
+    """Used by agent.py. Requires the bot loop to have started."""
+    token = BOT_TOKEN
+    if not token:
+        return
+    from aiogram import Bot
+    from aiogram.client.default import DefaultBotProperties
+    bot = Bot(token=token, default=DefaultBotProperties(parse_mode="HTML"))
+    try:
+        await bot.send_message(chat_id, text, disable_web_page_preview=True)
+    finally:
+        await bot.session.close()
 
 
 def start_telegram_bot_task() -> None:

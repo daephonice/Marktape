@@ -1,8 +1,8 @@
-"""Mock isolated lend book for PreStocks.
+"""Mock isolated lend book for tokenized stocks.
 
-Paper market: deposit a PreStock, borrow USDC or SOL, keep the name.
-No Jupiter/Kamino vaults exist for these mints. Positions live in Postgres.
-Oracle is PreStocks tokenPrice via the shared prices cache.
+Paper market: deposit a tokenized stock, borrow USDC or BNB, keep the name.
+Paper book. Not Venus/Lista. Positions live in Postgres.
+Oracle is tokenized stocks tokenPrice via the shared prices cache.
 """
 from __future__ import annotations
 
@@ -13,14 +13,14 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-import prestocks
+import rwa
 import prices
 from database import SessionLocal
 from models import LendPosition, utcnow
 
 log = logging.getLogger("lend")
 
-DEBT_SYMBOLS = ("USDC", "SOL")
+DEBT_SYMBOLS = ("USDC", "BNB")
 STALE_SECONDS = 300
 BASE_APY = 0.02
 KINK = 0.80
@@ -28,13 +28,13 @@ SLOPE_PRE = 0.04
 SLOPE_POST = 0.44
 LIQ_BONUS = 0.05
 
-# USDC debt is PreLendd's book. SOL debt is tighter because SOL moves more.
+# USDC debt is PreLendd's book. BNB debt is tighter because BNB moves more.
 PARAMS = {
     "USDC": {"ltv": 0.45, "lt": 0.55},
-    "SOL": {"ltv": 0.40, "lt": 0.50},
+    "BNB": {"ltv": 0.40, "lt": 0.50},
 }
 
-_ADDR_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+_ADDR_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
 
 
 def _now() -> datetime:
@@ -80,7 +80,7 @@ def _price(symbol: str) -> float | None:
 def _oracle_age() -> float | None:
     data = prices.get_prices()
     if not data or not data.get("updatedAt"):
-        snap = prestocks.get_cached_snapshot()
+        snap = rwa.get_cached_snapshot()
         ts = snap.get("fetchedAt")
         if not ts:
             return None
@@ -399,9 +399,7 @@ def operate(wallet: str, col_sym: str, debt_sym: str, col_delta: float, debt_del
         raise ValueError("Invalid wallet")
     col_sym, debt_sym = col_sym.upper(), debt_sym.upper()
     if debt_sym not in DEBT_SYMBOLS:
-        raise ValueError("Debt must be USDC or SOL")
-    if prestocks.is_blocked_mint((prices.get_asset(col_sym) or {}).get("mint") or ""):
-        raise ValueError("Mint not supported")
+        raise ValueError("Debt must be USDC or BNB")
     asset = prices.get_asset(col_sym)
     if asset is None or asset.get("kind") != "stock":
         raise ValueError("Unknown collateral")

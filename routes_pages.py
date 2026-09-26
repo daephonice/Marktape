@@ -61,8 +61,21 @@ async def lend_vault_page(request: Request, symbol: str):
 async def token_page(request: Request, symbol: str):
     asset = prices.get_asset(symbol)
     if asset is None:
-        await prices.wait_ready()  # cold start: first PreStocks refresh may not have landed
+        await prices.wait_ready()  # cold start: first board refresh may not have landed
         asset = prices.get_asset(symbol)
     if asset is None:
         raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
     return templates.TemplateResponse(request, "token.html", {"token": asset})
+
+
+@router.get("/board", response_class=HTMLResponse)
+async def board_page(request: Request):
+    import rwa
+    import market_stats
+    snap = rwa.get_cached_snapshot()
+    return templates.TemplateResponse(request, "board.html", {
+        "tokens": snap.get("tokens") or [],
+        "stats": market_stats.get_stats(),
+        "fmt_compact": market_stats.fmt_compact,
+        "session": snap.get("session") or rwa.session_now(),
+    })

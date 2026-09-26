@@ -1,0 +1,102 @@
+"""BNB tokenized-stock universe + mark/tape math.
+Tape = GeckoTerminal. Mark = Yahoo last cash print. Both free, no key.
+"""
+from __future__ import annotations
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+USDT = "0x55d398326f99059fF775485246999027B3197955"
+WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+NY = ZoneInfo("America/New_York")
+
+UNIVERSE = [
+    {"underlying":"NVDA","yahoo":"NVDA","name":"NVIDIA","wrappers":[
+        {"symbol":"NVDAx","platform":"xstocks","address":"0xc845b2894dBddd03858fd2D643B4eF725fE0849d"},
+        {"symbol":"NVDAon","platform":"ondo","address":"0xA9eE28C80f960B889dFbd1902055218cBa016F75"},
+    ]},
+    {"underlying":"TSLA","yahoo":"TSLA","name":"Tesla","wrappers":[
+        {"symbol":"TSLAx","platform":"xstocks","address":"0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0"},
+        {"symbol":"TSLAon","platform":"ondo","address":"0x2494b603319d4D9F9715c9f4496d9E0364B59d93"},
+    ]},
+    {"underlying":"AAPL","yahoo":"AAPL","name":"Apple","wrappers":[
+        {"symbol":"AAPLx","platform":"xstocks","address":"0x9d275685dC284C8eB1C79f6ABA7a63Dc75ec890a"},
+        {"symbol":"AAPLon","platform":"ondo","address":"0x390a684EF9cADE28A7AD0DFa61AB1Eb3842618c4"},
+    ]},
+    {"underlying":"META","yahoo":"META","name":"Meta","wrappers":[
+        {"symbol":"METAx","platform":"xstocks","address":"0x96702be57Cd9777f835117a809C7124fe4ec989A"},
+        {"symbol":"METAon","platform":"ondo","address":"0xD7dF5863A3e742F0c767768cDfcb63f09E0422f6"},
+    ]},
+    {"underlying":"AMD","yahoo":"AMD","name":"AMD","wrappers":[
+        {"symbol":"AMDx","platform":"xstocks","address":"0x3522513E5F146a2006e2901b05f16B2821485E19"},
+        {"symbol":"AMDon","platform":"ondo","address":"0x9f16E46c73b43BDB70861247d537bEE4eA18F639"},
+    ]},
+    {"underlying":"QQQ","yahoo":"QQQ","name":"Invesco QQQ","wrappers":[
+        {"symbol":"QQQx","platform":"xstocks","address":"0xa753A7395cAe905Cd615Da0B82A53E0560f250af"},
+        {"symbol":"QQQon","platform":"ondo","address":"0x0cdE6936d305d5B34667fC46425E852efd73559a"},
+    ]},
+    {"underlying":"SPCX","yahoo":None,"name":"SpaceX","wrappers":[
+        {"symbol":"SPCXx","platform":"xstocks","address":"0x68fa48b1c2fe52b3d776e1953e0e782b5044ce28"},
+        {"symbol":"SPCXon","platform":"ondo","address":"0xd0a58BC9D88D3FF48C0294Cb7e45937d0E41A928"},
+        {"symbol":"SPCXB","platform":"bstocks","address":"0xbe9d156892e55e7154bcd3cb0fea677f9d3103e1"},
+    ]},
+]
+
+def wrappers():
+    out = []
+    for u in UNIVERSE:
+        for w in u["wrappers"]:
+            out.append({**w, "underlying": u["underlying"], "yahoo": u["yahoo"], "name": u["name"]})
+    return out
+
+def by_symbol(symbol: str):
+    s = (symbol or "").upper()
+    return next((w for w in wrappers() if w["symbol"].upper() == s), None)
+
+def premium(token_price, mark_price):
+    if not mark_price or not token_price:
+        return None
+    return token_price / mark_price - 1
+
+def format_premium(p) -> str:
+    if p is None:
+        return "—"
+    pct = p * 100
+    return f"{'+' if pct > 0 else ''}{pct:.1f}%"
+
+def premium_status(p) -> str:
+    if p is None: return "flat"
+    if p > 0: return "rich"
+    if p < 0: return "cheap"
+    return "flat"
+
+def session_now(now=None):
+    now = now or datetime.now(timezone.utc)
+    ny = now.astimezone(NY)
+    open_t = ny.replace(hour=9, minute=30, second=0, microsecond=0)
+    close_t = ny.replace(hour=16, minute=0, second=0, microsecond=0)
+    if ny.weekday() >= 5:
+        label = "WEEKEND"
+    elif ny < open_t:
+        label = "PRE-MARKET"
+    elif ny >= close_t:
+        label = "AFTER-HOURS"
+    else:
+        label = "CASH OPEN"
+    return {"label": label, "cashOpen": label == "CASH OPEN", "ny": ny.isoformat(), "utc": now.astimezone(timezone.utc).isoformat()}
+
+_snapshot_cache = {"fetchedAt": None, "session": None, "tokens": [], "groups": []}
+
+def get_cached_snapshot():
+    return _snapshot_cache
+
+def set_cached_snapshot(tokens, groups=None):
+    global _snapshot_cache
+    _snapshot_cache = {
+        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "session": session_now(),
+        "tokens": tokens,
+        "groups": groups or [],
+    }
+    return _snapshot_cache

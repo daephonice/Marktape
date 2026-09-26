@@ -11,7 +11,7 @@ def utcnow():
 
 class PriceSnapshot(Base):
     """Rolling price history per symbol. Enough rows for a 24-72h sparkline.
-    Not the live board cache — that lives in memory (see prestocks.py)."""
+    Not the live board cache — that lives in memory (see rwa.py)."""
     __tablename__ = "price_snapshots"
 
     id = Column(Integer, primary_key=True)
@@ -19,6 +19,8 @@ class PriceSnapshot(Base):
     token_price = Column(Float, nullable=False)
     mark_price = Column(Float, nullable=False)
     premium = Column(Float, nullable=True)
+    platform = Column(String, nullable=True)
+    underlying = Column(String, nullable=True)
     fetched_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 
     __table_args__ = (
@@ -34,6 +36,9 @@ class Watch(Base):
     chat_id = Column(BigInteger, nullable=False, index=True)
     symbol = Column(String, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    threshold = Column(Float, nullable=True)
+    last_alert_at = Column(DateTime(timezone=True), nullable=True)
+    last_alert_premium = Column(Float, nullable=True)
 
     __table_args__ = (
         Index("ix_watches_chat_symbol", "chat_id", "symbol", unique=True),
@@ -41,7 +46,7 @@ class Watch(Base):
 
 
 class LendPosition(Base):
-    """Mock isolated-vault position: one wallet × one PreStock × one debt mint."""
+    """Mock isolated-vault position: one wallet × one tokenized stock × one debt token."""
     __tablename__ = "lend_positions"
 
     id = Column(Integer, primary_key=True)
@@ -62,7 +67,7 @@ class LendPosition(Base):
 
 
 class NewsItem(Base):
-    """Homepage news feed entry for one PreStocks symbol. Price / change / MC
+    """Homepage news feed entry for one tokenized-stock symbol. Price / change / MC
     shown next to it are live, read from the price cache — not stored here."""
     __tablename__ = "news_items"
 
