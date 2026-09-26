@@ -46,8 +46,9 @@
     prices: {},
     assets: {},
     range: '1D',
-    points: [],     // [[ms, price], ...] history for the selected range
-    group: null,    // /api/token/{underlying} result once loaded (group pages only)
+    points: [],       // [[ms, price], ...] history for the selected range (single-series)
+    multiChart: null, // { mark: [[ms,px]], wrappers: { SYM: [[ms,px]] } } for group pages
+    group: null,      // /api/token/{underlying} result once loaded (group pages only)
   };
 
   // ---- Formatting ---------------------------------------------------------
@@ -149,11 +150,101 @@
     return n;
   }
 
+  // Multi-series palette: cash mark + three wrapper platforms
+  const SERIES_COLORS = {
+    mark:    '#94a3b8', // slate — cash/reference line
+    xstocks: '#60a5fa', // blue
+    ondo:    '#a78bfa', // purple
+    bstocks: '#34d399', // green
+  };
+
+  // Map wrapper symbol → platform using the group data
+  function _wrapperPlatform(sym) {
+    if (!state.group) return null;
+    const w = (state.group.wrappers || []).find((x) => x.symbol === sym);
+    return w ? w.platform : null;
+  }
+
   function drawChart() {
+    els.plot.textContent = '';
+
+    // ---- Multi-series mode (group page after first fetch) ----
+    if (IS_GROUP && state.multiChart) {
+      const mc = state.multiChart;
+      const hasMark = (mc.mark || []).length >= 2;
+      const wrapperEntries = Object.entries(mc.wrappers || {}).filter(([, pts]) => pts.length >= 2);
+      const hasAny = hasMark || wrapperEntries.length > 0;
+
+      els.noHist.hidden = hasAny;
+      els.axis.hidden = !hasAny;
+      if (!hasAny) {
+        els.noHist.hidden = false;
+        els.noHist.textContent = 'Tape history starts after first refresh.';
+        return;
+      }
+
+      // Collect all values for global min/max
+      const allVals = [];
+      if (hasMark) mc.mark.forEach(([, v]) => allVals.push(v));
+      wrapperEntries.forEach(([, pts]) => pts.forEach(([, v]) => allVals.push(v)));
+
+      const min = Math.min(...allVals);
+      const max = Math.max(...allVals);
+      const span = max - min || Math.abs(max) * 0.001 || 1;
+
+      // Shared x-axis: use wall-clock timestamps mapped to [0,W]
+      const allTs = [];
+      if (hasMark) mc.mark.forEach(([t]) => allTs.push(t));
+      wrapperEntries.forEach(([, pts]) => pts.forEach(([t]) => allTs.push(t)));
+      const minTs = Math.min(...allTs);
+      const maxTs = Math.max(...allTs);
+      const tsSpan = maxTs - minTs || 1;
+
+      const xTs = (t) => ((t - minTs) / tsSpan) * W;
+      const y   = (v) => PAD_T + (H - PAD_T - PAD_B) * (1 - (v - min) / span);
+
+      function pathD(pts) {
+        return pts.map(([t, v], i) => `${i ? 'L' : 'M'}${xTs(t).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+      }
+
+      [0, 0.5, 1].forEach((f) => {
+        const gy = PAD_T + (H - PAD_T - PAD_B) * f;
+        els.plot.appendChild(svgEl('line', { class: 'tk-grid', x1: 0, x2: W, y1: gy, y2: gy }));
+      });
+
+      // Draw wrappers first (underneath mark)
+      wrapperEntries.forEach(([sym, pts]) => {
+        const plat = _wrapperPlatform(sym) || 'xstocks';
+        const color = SERIES_COLORS[plat] || UP;
+        els.plot.appendChild(svgEl('path', { d: pathD(pts), class: 'tk-line tk-line-wrapper', stroke: color, 'stroke-opacity': '0.75' }));
+      });
+
+      // Draw cash mark on top with gradient fill
+      if (hasMark) {
+        const color = SERIES_COLORS.mark;
+        const line = pathD(mc.mark);
+        const defs = svgEl('defs', {});
+        const grad = svgEl('linearGradient', { id: 'tk-grad', x1: 0, y1: 0, x2: 0, y2: 1 });
+        grad.appendChild(svgEl('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': 0.18 }));
+        grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }));
+        defs.appendChild(grad);
+        els.plot.appendChild(defs);
+        const lastMark = mc.mark[mc.mark.length - 1];
+        els.plot.appendChild(svgEl('path', { d: `${line} L${xTs(lastMark[0]).toFixed(1)},${H} L${xTs(mc.mark[0][0]).toFixed(1)},${H} Z`, fill: 'url(#tk-grad)' }));
+        els.plot.appendChild(svgEl('path', { d: line, class: 'tk-line', stroke: color }));
+      }
+
+      const labels = els.axis.children;
+      labels[0].textContent = fmtPrice(max);
+      labels[1].textContent = fmtPrice((max + min) / 2);
+      labels[2].textContent = fmtPrice(min);
+      return;
+    }
+
+    // ---- Single-series mode (crypto / individual wrapper) ----
     const vals = state.points.map((pt) => pt[1]);
     const live = state.prices[SYMBOL];
     if (live && vals.length) vals.push(live.price);
-    els.plot.textContent = '';
     els.noHist.hidden = vals.length >= 2;
     els.axis.hidden = vals.length < 2;
     if (vals.length < 2) return;
@@ -186,13 +277,54 @@
     labels[2].textContent = fmtPrice(min);
   }
 
+  // ---- Chart legend (group pages only) -----------------------------------
+  function renderLegend(multiChart) {
+    let legend = document.getElementById('tk-chart-legend');
+    if (!IS_GROUP) { if (legend) legend.remove(); return; }
+    if (!legend) {
+      legend = document.createElement('div');
+      legend.id = 'tk-chart-legend';
+      legend.className = 'tk-chart-legend';
+      const plotWrap = els.plot.parentElement;
+      plotWrap.parentElement.insertBefore(legend, plotWrap.nextSibling);
+    }
+    legend.innerHTML = '';
+    const LABEL = { mark: 'Cash', xstocks: 'xStocks', ondo: 'Ondo', bstocks: 'bStocks' };
+    const COLOR = { mark: '#94a3b8', xstocks: '#60a5fa', ondo: '#a78bfa', bstocks: '#34d399' };
+    const hasMark = (multiChart.mark || []).length >= 2;
+    if (hasMark) {
+      const dot = `<span class="tk-legend-dot" style="background:${COLOR.mark}"></span>`;
+      legend.insertAdjacentHTML('beforeend', `<span class="tk-legend-item">${dot}${LABEL.mark}</span>`);
+    }
+    Object.entries(multiChart.wrappers || {}).forEach(([sym, pts]) => {
+      if (pts.length < 2) return;
+      const plat = _wrapperPlatform(sym) || 'xstocks';
+      const color = COLOR[plat] || '#60a5fa';
+      const label = LABEL[plat] || plat;
+      const dot = `<span class="tk-legend-dot" style="background:${color}"></span>`;
+      legend.insertAdjacentHTML('beforeend', `<span class="tk-legend-item">${dot}${sym}</span>`);
+    });
+    if (legend.children.length === 0) {
+      legend.insertAdjacentHTML('beforeend', '<span class="tk-legend-empty">Tape history starts after first refresh.</span>');
+    }
+  }
+
   let chartReq = 0;
   async function loadChart() {
     const req = ++chartReq;
+    const chartSym = IS_GROUP ? UNDERLYING : SYMBOL;
     try {
-      const data = await getJSON(`/api/chart/${encodeURIComponent(SYMBOL)}?range=${state.range}`);
+      const data = await getJSON(`/api/chart/${encodeURIComponent(chartSym)}?range=${state.range}`);
       if (req !== chartReq) return;
-      state.points = data.points || [];
+      if (IS_GROUP && data.wrappers !== undefined) {
+        // Multi-series response
+        state.multiChart = { mark: data.mark || [], wrappers: data.wrappers || {} };
+        state.points = [];
+        renderLegend(state.multiChart);
+      } else {
+        state.points = data.points || [];
+        state.multiChart = null;
+      }
     } catch (err) {
       if (req !== chartReq) return;
       // keep whatever we had for this range
