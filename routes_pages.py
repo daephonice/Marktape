@@ -59,13 +59,28 @@ async def lend_vault_page(request: Request, symbol: str):
 
 @router.get("/t/{symbol}", response_class=HTMLResponse)
 async def token_page(request: Request, symbol: str):
-    asset = prices.get_asset(symbol)
-    if asset is None:
-        await prices.wait_ready()  # cold start: first board refresh may not have landed
-        asset = prices.get_asset(symbol)
-    if asset is None:
-        raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
-    return templates.TemplateResponse(request, "token.html", {"token": asset})
+    import rwa
+    sym = (symbol or "").upper()
+    underlying = next((u for u in rwa.UNIVERSE if u["underlying"] == sym), None)
+    focus_symbol = None
+    if underlying is None:
+        w = rwa.by_symbol(sym)
+        if w is None:
+            asset = prices.get_asset(symbol)
+            if asset is None:
+                await prices.wait_ready()  # cold start: first board refresh may not have landed
+                asset = prices.get_asset(symbol)
+            if asset is None:
+                raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
+            return templates.TemplateResponse(request, "token.html", {"token": asset})
+        underlying = next(u for u in rwa.UNIVERSE if u["underlying"] == w["underlying"])
+        focus_symbol = w["symbol"]
+    return templates.TemplateResponse(request, "token.html", {
+        "token": None,
+        "underlying": underlying["underlying"],
+        "underlying_name": underlying["name"],
+        "focus_symbol": focus_symbol,
+    })
 
 
 @router.get("/board", response_class=HTMLResponse)

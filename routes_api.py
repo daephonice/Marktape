@@ -91,11 +91,22 @@ async def get_chart(symbol: str, range: str = "1D"):
 @router.get("/token/{symbol}")
 async def get_token(symbol: str):
     snap = rwa.get_cached_snapshot()
-    row = next((t for t in snap.get("tokens", []) if t["symbol"].upper() == symbol.upper()), None)
-    if not row:
+    sym = symbol.upper()
+    underlying_meta = next((u for u in rwa.UNIVERSE if u["underlying"] == sym), None)
+    if underlying_meta is not None:
+        und = sym
+        focus = None
+    else:
+        row = next((t for t in snap.get("tokens", []) if t["symbol"].upper() == sym), None)
+        if not row:
+            raise HTTPException(status_code=404, detail="Unknown symbol")
+        und = row["underlying"]
+        focus = row["symbol"]
+    group = next((g for g in snap.get("groups", []) if g["underlying"] == und), None)
+    if not group:
         raise HTTPException(status_code=404, detail="Unknown symbol")
-    out = dict(row)
-    out["siblings"] = [t for t in snap.get("tokens", []) if t["underlying"] == row["underlying"]]
+    out = dict(group)
+    out["focusSymbol"] = focus
     out["session"] = snap.get("session")
     return out
 
