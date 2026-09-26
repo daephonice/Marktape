@@ -39,6 +39,8 @@
     hldRows: $('hld-rows'),
     hldEmpty: $('hld-empty'),
     hldDisc: $('hld-disc'),
+    sessChip: $('sess-chip'),
+    sessLabel: $('sess-label'),
   };
 
   const state = {
@@ -514,12 +516,21 @@
     if (Array.from(els.newsList.children).some((n) => !n.dataset.measured)) requestAnimationFrame(measureNews);
   }
 
+  // ---- Session chip --------------------------------------------------------
+  const SESS_CLASS = { 'CASH OPEN': 'sess-open', 'PRE-MARKET': 'sess-pre', 'AFTER-HOURS': 'sess-ah', 'WEEKEND': 'sess-we' };
+  function renderSession() {
+    if (!els.sessChip || !state.session) return;
+    els.sessLabel.textContent = state.session.label;
+    els.sessChip.className = 'sess-chip ' + (SESS_CLASS[state.session.label] || 'sess-we');
+  }
+
   // ---- Render orchestration -----------------------------------------------
   function renderAll() {
     renderBalance();
     renderStocks();
     renderHoldings();
     renderNews();
+    renderSession();
   }
 
   // ---- Data ---------------------------------------------------------------
@@ -567,6 +578,7 @@
       state.session = data.session || null;
       state.groupsLoaded = true;
       renderStocks();
+      renderSession();
     } catch (err) { /* keep last groups */ } finally {
       boardBusy = false;
     }

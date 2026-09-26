@@ -163,5 +163,25 @@
 
   setInterval(() => { refreshBoard(); refreshStats(); }, REFRESH_MS);
 
+  // ---- Session chip --------------------------------------------------------
+  const SESS_MS = 30000;
+  const SESS_CLASS = { 'CASH OPEN': 'sess-open', 'PRE-MARKET': 'sess-pre', 'AFTER-HOURS': 'sess-ah', 'WEEKEND': 'sess-we' };
+  async function refreshSession() {
+    const chip = document.getElementById('sess-chip');
+    const label = document.getElementById('sess-label');
+    if (!chip) return;
+    try {
+      const resp = await fetch('/api/session');
+      if (!resp.ok) return;
+      const s = await resp.json();
+      label.textContent = s.label;
+      chip.className = 'sess-chip ' + (SESS_CLASS[s.label] || 'sess-we');
+    } catch (err) {
+      console.warn('session refresh failed', err);
+    }
+  }
+  refreshSession();
+  setInterval(refreshSession, SESS_MS);
+
   loadAllSparklines();
 })();
