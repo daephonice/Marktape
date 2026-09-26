@@ -1,22 +1,18 @@
 """BSC native + BEP-20 balances. Public RPC, no key."""
 from __future__ import annotations
 
-import os
 import re
 import time
 import logging
 
-import httpx
-
 import prices
 import rwa
+import rpc
 
 log = logging.getLogger("balances")
-BSC_RPC_URL = os.getenv("BSC_RPC_URL", "https://bsc-dataseed.binance.org")
 BALANCE_TTL = 6.0
 _ADDR_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
 BALANCE_OF = "0x70a08231"
-_client = None
 _balance_cache = {}
 
 
@@ -31,20 +27,8 @@ def valid_address(address: str) -> bool:
     return bool(_ADDR_RE.match(address or ""))
 
 
-def _http():
-    global _client
-    if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(timeout=10)
-    return _client
-
-
 async def _rpc(method, params):
-    resp = await _http().post(BSC_RPC_URL, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-    resp.raise_for_status()
-    body = resp.json()
-    if body.get("error"):
-        raise RuntimeError(body["error"])
-    return body["result"]
+    return await rpc.call(method, params)
 
 
 def _pad(addr: str) -> str:

@@ -1,7 +1,6 @@
 """Build unsigned BNB / BEP-20 transfers. Wallet broadcasts via eth_sendTransaction."""
 from __future__ import annotations
 
-import os
 import re
 import time
 import logging
@@ -10,7 +9,6 @@ from decimal import Decimal
 import prices
 
 log = logging.getLogger("send")
-BSC_RPC_URL = os.getenv("BSC_RPC_URL", "https://bsc-dataseed.binance.org")
 CHAIN_ID = 56
 _ADDR_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
 TRANSFER_SEL = "0xa9059cbb"
