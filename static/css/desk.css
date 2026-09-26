@@ -280,10 +280,29 @@ a.hm-action-btn { cursor: pointer; }
 .hm-stk-row .hm-sym { flex-shrink: 1; min-width: 0; }
 .hm-stk-row .hm-sym-text { flex-shrink: 1; }
 .hm-stk-chg { font-size: 13px; font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 2px; }
+.hm-stk-mark { font-size: 13px; font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 2px; color: var(--hm-muted); }
 .hm-n-line { line-height: 1.45; }
 .hm-n-dot { margin: 0 4px; }
 .hm-stocks .hm-n-toggle { margin-top: 10px; color: var(--accent); }
 .hm-stocks .hm-empty { padding: 20px 0; }
+
+.hm-tape-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.hm-tape-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  background: var(--hm-ctrl);
+}
+.hm-tape-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--hm-dim); }
+.hm-tape-val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hm-tape-prem { font-size: 12px; font-variant-numeric: tabular-nums; }
+.hm-tape-prem.pos { color: var(--hm-pos, #4ade80); }
+.hm-tape-prem.neg { color: var(--hm-neg, #fb7185); }
+.hm-tape-prem.flat { color: var(--hm-muted); }
+.hm-stk-foot { display: flex; align-items: center; font-size: 12px; margin-top: 10px; }
 
 /* Footer */
 .hm .hm-footer { width: 100%; padding-top: 24px; padding-bottom: 32px; }
