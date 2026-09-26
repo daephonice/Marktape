@@ -52,6 +52,7 @@ async def _refresh_stocks():
             "image": r.get("image"), "description": r.get("description"), "url": r.get("url"),
             "supply": None, "price": float(price), "mark": r.get("markPrice"),
             "premium": r.get("premium"), "platform": r.get("platform"), "underlying": r.get("underlying"),
+            "multiplier": r.get("multiplier"),
         }
     if records:
         _touch()
@@ -155,7 +156,8 @@ def get_assets():
     assets = {sym: {"name": m["name"], "image": m["image"], "kind": "token", "mint": m["mint"]} for sym, m in TOKEN_ASSETS.items()}
     for sym, s in _stocks.items():
         assets[sym] = {"name": s["name"], "image": s["image"], "kind": "stock", "mint": s["mint"],
-                       "platform": s.get("platform"), "underlying": s.get("underlying")}
+                       "platform": s.get("platform"), "underlying": s.get("underlying"),
+                       "multiplier": s.get("multiplier")}
     return {"assets": assets}
 
 
@@ -172,7 +174,7 @@ def get_asset(symbol: str):
     if s:
         return {"symbol": sym, "kind": "stock", "name": s["name"], "image": s["image"], "mint": s["mint"],
                 "description": s["description"], "url": s["url"], "platform": s.get("platform"),
-                "underlying": s.get("underlying")}
+                "underlying": s.get("underlying"), "multiplier": s.get("multiplier")}
     return None
 
 
