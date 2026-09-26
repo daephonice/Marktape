@@ -894,3 +894,10 @@ html.trd-lock, html.trd-lock body { overflow: hidden; }
 .trd-info-list dt { margin: 0; font-size: 14px; color: var(--hm-muted, #9d9ea2); flex-shrink: 0; }
 .trd-info-list dd { margin: 0; font-size: 14px; font-weight: 500; text-align: right; color: var(--hm-text, #fafafa); word-break: break-word; }
 .trd-info-list dd:has(svg) { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); }
+
+/* Multi-series chart legend (group token pages) */
+.tk-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 6px 0 2px; }
+.tk-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--hm-muted, #9d9ea2); }
+.tk-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tk-legend-empty { font-size: 12px; color: var(--hm-muted, #9d9ea2); font-style: italic; }
+.tk-line-wrapper { fill: none; stroke-width: 1.5px; }
