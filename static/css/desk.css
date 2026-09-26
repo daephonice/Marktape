@@ -44,6 +44,15 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 }
 @media (min-width: 1024px) { .mkt-wordmark { font-size: 22px; } }
 .mkt-header-right { display: flex; align-items: center; gap: 16px; }
+.sess-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-family: 'Geist', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; border: 1px solid var(--border, #2C3A48); background: var(--surface-2, #1A2430); color: var(--muted, #9AA8B5); white-space: nowrap; }
+.sess-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.sess-chip.sess-open { color: var(--win, #22C55E); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.1); }
+.sess-chip.sess-pre, .sess-chip.sess-ah { color: #eaaa08; border-color: rgba(234,170,8,.35); background: rgba(234,170,8,.1); }
+.sess-chip.sess-we { color: var(--dim, #6B7A89); border-color: var(--border, #2C3A48); background: var(--surface-2, #1A2430); }
+.hm .sess-chip { border-color: var(--hm-line); background: var(--hm-ctrl); color: var(--hm-muted); }
+.hm .sess-chip.sess-open { color: var(--hm-pos); border-color: rgba(74,222,128,.35); background: rgba(74,222,128,.1); }
+.hm .sess-chip.sess-pre, .hm .sess-chip.sess-ah { color: var(--hm-star); border-color: rgba(234,170,8,.35); background: rgba(234,170,8,.1); }
+.hm .sess-chip.sess-we { color: var(--hm-dim); border-color: var(--hm-line); background: var(--hm-ctrl); }
 .mkt-connect-btn {
   font-family: 'Geist', sans-serif;
   font-size: 13px;
