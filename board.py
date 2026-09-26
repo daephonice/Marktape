@@ -1,4 +1,10 @@
-"""StreetTape board: Yahoo mark + GeckoTerminal tape."""
+"""StreetTape board: Yahoo mark + GeckoTerminal tape.
+
+Gecko never blocks on Yahoo: the snapshot is published as soon as tape
+prices land (mark null), then patched in place once marks arrive. Yahoo
+misses fall back query2 -> query1 -> last known mark in price_snapshots,
+per-ticker, all run concurrently so one slow/dead host can't stall the rest.
+"""
 from __future__ import annotations
 
 import os
@@ -6,6 +12,7 @@ import asyncio
 import logging
 
 import httpx
+from sqlalchemy import select
 
 import rwa
 from database import SessionLocal
@@ -14,17 +21,43 @@ from models import PriceSnapshot
 log = logging.getLogger("board")
 REFRESH_SECONDS = int(os.getenv("BOARD_REFRESH_SECONDS", "45"))
 GECKO = "https://api.geckoterminal.com/api/v2"
-YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart"
-HEADERS = {"User-Agent": "StreetTape/1.0", "Accept": "application/json"}
+YAHOO_HOSTS = (
+    "https://query2.finance.yahoo.com/v8/finance/chart",
+    "https://query1.finance.yahoo.com/v8/finance/chart",
+)
+YAHOO_TIMEOUT = 3.0
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+}
 _task = None
 
 
-async def _yahoo_marks(client: httpx.AsyncClient) -> dict:
-    out = {}
-    tickers = sorted({u["yahoo"] for u in rwa.UNIVERSE if u.get("yahoo")})
-    for tkr in tickers:
+def _last_known_mark(tkr: str) -> float | None:
+    und = next((u["underlying"] for u in rwa.UNIVERSE if u.get("yahoo") == tkr), None)
+    if not und:
+        return None
+    db = SessionLocal()
+    try:
+        row = db.execute(
+            select(PriceSnapshot.mark_price)
+            .where(PriceSnapshot.underlying == und, PriceSnapshot.mark_price > 0)
+            .order_by(PriceSnapshot.fetched_at.desc())
+            .limit(1)
+        ).first()
+        return float(row[0]) if row and row[0] else None
+    except Exception:
+        log.warning("board: last-known-mark lookup failed for %s", tkr, exc_info=True)
+        return None
+    finally:
+        db.close()
+
+
+async def _yahoo_one(client: httpx.AsyncClient, tkr: str) -> tuple[str, float | None]:
+    for host in YAHOO_HOSTS:
         try:
-            resp = await client.get(f"{YAHOO}/{tkr}", params={"interval": "1d", "range": "5d"})
+            resp = await client.get(f"{host}/{tkr}", params={"interval": "1d", "range": "5d"}, timeout=YAHOO_TIMEOUT)
             resp.raise_for_status()
             result = (resp.json().get("chart") or {}).get("result") or []
             if not result:
@@ -32,10 +65,25 @@ async def _yahoo_marks(client: httpx.AsyncClient) -> dict:
             meta = result[0].get("meta") or {}
             px = meta.get("regularMarketPrice") or meta.get("chartPreviousClose") or meta.get("previousClose")
             if px:
-                out[tkr] = float(px)
+                return tkr, float(px)
+        except httpx.TimeoutException:
+            log.warning("board: yahoo %s timed out on %s", tkr, host)
         except Exception:
-            log.warning("board: yahoo %s failed", tkr, exc_info=True)
-        await asyncio.sleep(0.12)
+            log.warning("board: yahoo %s failed on %s", tkr, host, exc_info=True)
+    fallback = await asyncio.to_thread(_last_known_mark, tkr)
+    return tkr, fallback
+
+
+async def _yahoo_marks(client: httpx.AsyncClient) -> dict:
+    tickers = sorted({u["yahoo"] for u in rwa.UNIVERSE if u.get("yahoo")})
+    results = await asyncio.gather(*(_yahoo_one(client, tkr) for tkr in tickers), return_exceptions=True)
+    out = {}
+    for r in results:
+        if isinstance(r, Exception):
+            continue
+        tkr, px = r
+        if px:
+            out[tkr] = px
     return out
 
 
@@ -108,9 +156,7 @@ def _group(tokens):
     return groups
 
 
-async def build_snapshot():
-    async with httpx.AsyncClient(timeout=12, headers=HEADERS) as client:
-        marks, tapes = await asyncio.gather(_yahoo_marks(client), _gecko_prices(client))
+def _build_tokens(tapes: dict, marks: dict) -> list[dict]:
     tokens = []
     for w in rwa.wrappers():
         has_addr = bool(w.get("address"))
@@ -138,6 +184,21 @@ async def build_snapshot():
             "multiplier": w.get("multiplier"),
         })
     tokens.sort(key=lambda t: abs(t["premium"] or 0), reverse=True)
+    return tokens
+
+
+async def build_snapshot():
+    """Tape (Gecko) publishes the snapshot immediately with marks null.
+    Marks (Yahoo) patch it in place once they land, so a dead Yahoo never
+    blocks stock rows, the session chip's board copy, or news from appearing."""
+    async with httpx.AsyncClient(timeout=6, headers=HEADERS) as client:
+        tapes = await _gecko_prices(client)
+        tokens = _build_tokens(tapes, {})
+        snap = rwa.set_cached_snapshot(tokens, _group(tokens))
+
+        marks = await _yahoo_marks(client)
+
+    tokens = _build_tokens(tapes, marks)
     snap = rwa.set_cached_snapshot(tokens, _group(tokens))
     _persist(tokens)
     return snap

@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 import rwa
-import board as board_mod
 import balances
 import chart
 import prices
@@ -27,10 +26,7 @@ async def health():
 
 @router.get("/board")
 async def get_board():
-    snap = rwa.get_cached_snapshot()
-    if not snap.get("tokens"):
-        snap = await board_mod.build_snapshot()
-    return snap
+    return rwa.get_cached_snapshot()
 
 
 @router.get("/session")

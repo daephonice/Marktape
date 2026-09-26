@@ -20,7 +20,7 @@ from xml.etree import ElementTree as ET
 import httpx
 from sqlalchemy import select, delete
 
-import prices
+import rwa
 from database import SessionLocal
 from models import NewsItem
 
@@ -50,8 +50,12 @@ def _query_name(sym: str, name: str | None) -> str:
 
 
 def _stock_list() -> list[tuple[str, str]]:
-    assets = prices.get_assets()["assets"]
-    return [(sym, _query_name(sym, a.get("name"))) for sym, a in assets.items() if a.get("kind") == "stock"]
+    """(wrapper symbol, display name) pairs straight from the static universe —
+    no dependency on the board/price snapshot, so news can run even if Yahoo/Gecko are down."""
+    seen: dict[str, str] = {}
+    for w in rwa.wrappers():
+        seen.setdefault(w["symbol"], _query_name(w["symbol"], w.get("name")))
+    return list(seen.items())
 
 
 def _clean_title(title: str, source: str) -> str:
@@ -210,10 +214,6 @@ async def refresh() -> None:
 
 
 async def _loop() -> None:
-    for _ in range(20):  # wait for the price task to know listed names
-        await prices.wait_ready(5.0)
-        if _stock_list():
-            break
     try:
         await asyncio.to_thread(_load_cache)
     except Exception:
