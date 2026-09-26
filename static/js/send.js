@@ -13,10 +13,9 @@
 
   const TOAST_MS = 2500;
   const ANIM_MS = 260;
-  const SOL_RESERVE = 0.00001; // left behind when filling max SOL (fees)
-  const DECIMALS = { SOL: 9, USDT: 6, USDC: 6 }; // PreStocks: 6
-  const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  const B58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  const BNB_RESERVE = 0.00005; // left behind when filling max BNB (gas)
+  const DECIMALS = { BNB: 18, USDT: 18, USDC: 18 };
+  const EVM_RE = /^0x[a-fA-F0-9]{40}$/;
 
   const ICON = {
     plane: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13" fill="none"/></svg>',
@@ -52,14 +51,7 @@
   }
 
   function isValidAddress(s) {
-    if (!B58_RE.test(s)) return false;
-    let n = 0n;
-    for (const c of s) n = n * 58n + BigInt(B58.indexOf(c));
-    let bytes = 0;
-    while (n > 0n) { n >>= 8n; bytes++; }
-    let pad = 0;
-    while (pad < s.length && s[pad] === '1') pad++;
-    return bytes + pad === 32;
+    return EVM_RE.test(s || '');
   }
 
   const shortAddr = (a) => a.slice(0, 4) + '...' + a.slice(-4);
@@ -183,7 +175,7 @@
       <h3 class="snd-title">Send</h3>
       <button type="button" class="snd-opt">
         <span class="snd-opt-ic">${ICON.plane}</span>
-        <span class="snd-opt-tx"><b>Send to address</b><small>Send to a Solana address</small></span>
+        <span class="snd-opt-tx"><b>Send to address</b><small>Send to a BNB Chain address</small></span>
       </button>`;
     R.sheetBody.querySelector('.snd-opt').addEventListener('click', showAddress);
   }
@@ -195,7 +187,7 @@
       <div class="snd-card">
         <div class="snd-card-label">Receiving address</div>
         <div class="snd-card-row">
-          <input class="snd-addr" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="Enter Solana address" aria-label="Receiving address">
+          <input class="snd-addr" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="Enter 0x address" aria-label="Receiving address">
           <button type="button" class="snd-paste">Paste</button>
         </div>
       </div>
@@ -224,7 +216,7 @@
       }
     });
     cont.addEventListener('click', () => {
-      if (!isValidAddress(S.to)) { note.textContent = 'Enter a valid Solana address'; return; }
+      if (!isValidAddress(S.to)) { note.textContent = 'Enter a valid BNB Chain address'; return; }
       if (S.to === S.address) { note.textContent = "You can't send to your own address"; return; }
       showAmount();
     });
@@ -352,7 +344,7 @@
     if (!(d.bal > 0)) return;
     let coin = d.bal;
     S.max = false;
-    if (S.sym === 'SOL') coin = d.bal - SOL_RESERVE; // keep dust for the network fee
+    if (S.sym === 'BNB') coin = d.bal - BNB_RESERVE; // keep dust for the network fee
     else S.max = true;                              // tokens: server sends the exact full balance
     if (!(coin > 0)) return;
     S.raw = S.mode === 'coin' ? trunc(coin, decimalsOf(S.sym)) : trunc(coin * d.price, 2);
@@ -364,7 +356,7 @@
   function tokenOrder(c) {
     const syms = Object.keys(c.prices);
     const value = (s) => (c.holdings[s] || 0) * c.prices[s].price;
-    const rank = { SOL: 0, USDC: 1, USDT: 2 };
+    const rank = { BNB: 0, USDC: 1, USDT: 2 };
     return syms.sort((a, b) => {
       const va = value(a);
       const vb = value(b);
@@ -435,7 +427,7 @@
         toAddress: sess.to,
         symbol: sess.sym,
         amount,
-        sendMax: sess.max && sess.sym !== 'SOL',
+        sendMax: sess.max && sess.sym !== 'BNB',
       });
       if (S !== sess) return;
 
@@ -492,7 +484,7 @@
     const held = Object.keys(c.prices).filter((s) => value(s) > 0).sort((a, b) => value(b) - value(a));
     S = {
       host, address: c.address, stage: 'menu', to: '',
-      sym: host.symbol && c.prices[host.symbol] ? host.symbol : value('SOL') > 0 || !held.length ? 'SOL' : held[0],
+      sym: host.symbol && c.prices[host.symbol] ? host.symbol : value('BNB') > 0 || !held.length ? 'BNB' : held[0],
       mode: 'coin', raw: '', max: false, sending: false, tick: null,
     };
     root.hidden = false;

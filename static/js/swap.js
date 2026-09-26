@@ -1,10 +1,10 @@
 /* Buy / Sell sheets for the token page (frontend only).
  *
- *   Buy  : pay in SOL or USDC, type an amount (device keyboard), quick amounts.
- *   Sell : receive SOL or USDC, pick a % of the holding (slider / - +).
+ *   Buy  : pay in BNB or USDC, type an amount (device keyboard), quick amounts.
+ *   Sell : receive BNB or USDC, pick a % of the holding (slider / - +).
  *
- * A token can't be paid / received in itself, so on the SOL page only USDC is
- * offered and on the USDC page only SOL.
+ * A token can't be paid / received in itself, so on the BNB page only USDC is
+ * offered and on the USDC page only BNB.
  *
  * Host (token.js) calls MarktapeSwap.open({ side, symbol, getCtx, onDone }) where
  * getCtx() -> { address, holdings, prices, assets } (live state).
@@ -20,11 +20,11 @@
 
   const ANIM_MS = 260;
   const DEBOUNCE_MS = 450;
-  const PAY = ['SOL', 'USDC'];
-  const LOGO = { SOL: '/static/img/sol.svg', USDC: '/static/img/usdc.svg' };
-  const DEC = { SOL: 9, USDC: 6 };
-  const QUICK = { SOL: [0.1, 0.5, 1], USDC: [10, 50, 100] };
-  const SOL_RESERVE = 0.003;      // kept back for network fees / new token account
+  const PAY = ['BNB', 'USDC'];
+  const LOGO = { BNB: '/static/img/bnb.svg', USDC: '/static/img/usdc.svg' };
+  const DEC = { BNB: 18, USDC: 18 };
+  const QUICK = { BNB: [0.01, 0.05, 0.1], USDC: [10, 50, 100] };
+  const BNB_RESERVE = 0.0002;      // kept back for network fees / new token account
   const STEP = 5;                 // - / + step for the sell percentage
   const TOKEN_DEC = 9;
 
@@ -225,12 +225,12 @@
       });
       if (S !== sess || sess.quoteReq !== reqId) return;
       sess.quoting = false;
-      if (!order.transaction) {
-        sess.order = null;
-        setNote(order.deepLink ? 'No route found for this pair' : 'No route found');
-      } else {
+      if (order.uiOutAmount || order.deepLink) {
         sess.order = order;
-        setNote('');
+        setNote(order.transaction ? '' : 'Opens PancakeSwap to complete the swap');
+      } else {
+        sess.order = null;
+        setNote('No route found');
       }
       render();
     } catch (err) {
@@ -290,7 +290,7 @@
 
   function buyCalc(c) {
     const bal = c.holdings[S.cur] || 0;
-    const spendable = S.cur === 'SOL' ? Math.max(0, bal - SOL_RESERVE) : bal;
+    const spendable = S.cur === 'BNB' ? Math.max(0, bal - BNB_RESERVE) : bal;
     const v = parseFloat(S.raw) || 0;
     const usdIn = v * price(c, S.cur);
     const out = S.order && S.order.uiOutAmount ? S.order.uiOutAmount : 0;
@@ -352,12 +352,19 @@
 
   // ---- Swap -------------------------------------------------------------------
   async function doSwap() {
-    if (!S || S.busy || R.cta.disabled || !S.order || !S.order.transaction) return;
+    if (!S || S.busy || R.cta.disabled || !S.order) return;
     const sess = S;
     sess.busy = true;
     setNote('');
     render();
     try {
+      if (sess.order.deepLink && !sess.order.transaction) {
+        window.open(sess.order.deepLink, '_blank', 'noopener');
+        const host = sess.host;
+        close();
+        if (host.onSent) host.onSent();
+        return;
+      }
       let signed;
       try {
         signed = await window.MarktapeWallet.signTransactionForSend(sess.order.transaction);
@@ -367,11 +374,12 @@
       }
       if (S !== sess) return;
 
-      if (signed.signedTransactionBase64) {
+      if (signed.signature || signed.signedTransactionBase64) {
         const res = await postJSON('/api/swap/execute', {
           signedTransaction: signed.signedTransactionBase64,
+          txHash: signed.signature,
           requestId: sess.order.requestId,
-          provider: sess.order.provider || 'ultra',
+          provider: sess.order.provider || 'pancake',
         });
         if (res.status && res.status !== 'Success' && res.status !== 'success') {
           throw new Error('Swap failed on-chain, please try again');

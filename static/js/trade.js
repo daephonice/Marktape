@@ -1,7 +1,7 @@
 /* Trade (Swap) panel — /swap page, blue theme.
  * Sell card / swap-direction button / Buy card (read-only) / rate+gasless+
  * warning row / CTA. No in-site keyboard — the native mobile keyboard drives
- * the amount input. Debounced Jupiter Ultra order fetch ("Getting Price...")
+ * the amount input. Debounced StreetTape quote fetch ("Getting Price...")
  * while typing; warning icon opens a Price Info modal; on success
  * MarktapeSend.toast() shows the shared blue toast.
  *
@@ -11,13 +11,13 @@
  *
  * Non-custodial: /api/swap/order builds the Ultra order server-side (the API
  * key never reaches the browser), the wallet signs, /api/swap/execute
- * relays the signed tx to Ultra's /execute, which broadcasts it.
+ * opens PancakeSwap when no unsigned tx is available, which broadcasts it.
  */
 (function () {
   'use strict';
 
   const DEBOUNCE_MS = 450;
-  const DECIMALS = { SOL: 9, USDT: 6, USDC: 6 }; // PreStocks: 6
+  const DECIMALS = { BNB: 18, USDT: 18, USDC: 18 };
 
   const ICON = {
     chevron: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
@@ -29,7 +29,7 @@
     back: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19 5 12l7-7"/><path d="M19 12H5"/></svg>',
   };
 
-  const SOL_RESERVE = 0.003;
+  const BNB_RESERVE = 0.0002;
 
   const decimalsOf = (sym) => DECIMALS[sym] || 6;
 
@@ -247,7 +247,7 @@
   function tokenOrder(c) {
     const syms = Object.keys(c.prices);
     const value = (s) => (c.holdings[s] || 0) * c.prices[s].price;
-    const rank = { SOL: 0, USDC: 1, USDT: 2 };
+    const rank = { BNB: 0, USDC: 1, USDT: 2 };
     return syms.sort((a, b) => {
       const va = value(a);
       const vb = value(b);
@@ -340,7 +340,7 @@
 
   function maxSell() {
     let bal = sellBalance();
-    if (S.sell === 'SOL') bal = Math.max(0, bal - SOL_RESERVE);
+    if (S.sell === 'BNB') bal = Math.max(0, bal - BNB_RESERVE);
     return bal;
   }
 
@@ -407,7 +407,7 @@
         sess.note = '';
       } else {
         sess.order = null;
-        sess.note = order.deepLink ? 'No route found for this pair' : 'No route found';
+        sess.note = order.transaction ? '' : (order.deepLink ? 'Opens PancakeSwap to complete the swap' : 'No route found');
       }
       render();
     } catch (err) {
@@ -567,6 +567,7 @@
   // ---- Swap ------------------------------------------------------------------
   async function doSwap() {
     if (!S || S.swapping || !S.order || !S.order.uiOutAmount) return;
+    if (!S.order.transaction && S.order.deepLink) { window.open(S.order.deepLink, '_blank', 'noopener'); return; }
     if (!S.order.transaction) { scheduleQuote(); return; }
     const sess = S;
     sess.swapping = true;
@@ -615,9 +616,9 @@
   // ---- Public ------------------------------------------------------------------
   function pickDefaultSell(c) {
     const value = (s) => (c.holdings[s] || 0) * (c.prices[s] ? c.prices[s].price : 0);
-    if (value('SOL') > 0) return 'SOL';
+    if (value('BNB') > 0) return 'BNB';
     const held = Object.keys(c.prices).filter((s) => value(s) > 0).sort((a, b) => value(b) - value(a));
-    return held[0] || 'SOL';
+    return held[0] || 'BNB';
   }
 
   function pickDefaultBuy(c, sell) {

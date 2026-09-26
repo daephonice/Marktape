@@ -1,10 +1,10 @@
-/* Total balance (homepage). SOL + USDT + USDC held by the connected wallet,
+/* Total balance (homepage). BNB + USDT + USDC held by the connected wallet,
  * valued in USD. Prices poll every 2s, holdings every 6s, so the total moves
  * with the market like a wallet app. Nothing polls until a wallet is connected. */
 (function () {
   const PRICE_MS = 2000;
   const BALANCE_MS = 6000;
-  const ASSETS = ['SOL', 'USDT', 'USDC'];
+  const ASSETS = ['BNB', 'USDT', 'USDC'];
 
   const valueEl = document.getElementById('mkt-balance-value');
   const connectEl = document.getElementById('mkt-balance-connect');
@@ -12,8 +12,8 @@
 
   const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
   let address = null;
-  let prices = null;   // { SOL, USDT, USDC } in USD
-  let holdings = null; // { SOL, USDT, USDC } in UI units
+  let prices = null;   // { BNB, USDT, USDC } in USD
+  let holdings = null; // { BNB, USDT, USDC } in UI units
   let priceTimer = null;
   let balanceTimer = null;
   let gen = 0; // bumps on every wallet change so stale poll chains die

@@ -285,7 +285,7 @@
     }
   }
 
-  // Share = copy the Jupiter link; the icon turns into "Copied" for 2s.
+  // Share = copy the PancakeSwap link; the icon turns into "Copied" for 2s.
   let shareTimer = null;
   els.share.addEventListener('click', async () => {
     if (els.share.classList.contains('done')) return;

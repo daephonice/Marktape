@@ -1,5 +1,5 @@
 /* /swap host. Mounts MarktapeTrade into #trd-slot with the same
- * getCtx / onDone shape home.js used when the swap panel lived on home.
+ * getCtx / onDone shape home.js used when the swap panel lived on home. BSC quotes via /api/swap/order.
  */
 (function () {
   const slot = document.getElementById('trd-slot');

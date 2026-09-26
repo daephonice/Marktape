@@ -1,4 +1,4 @@
-/* Lend desk — mock isolated vaults for the 8 PreStocks names. */
+/* Lend desk — mock isolated vaults for tokenized stock names. */
 (function () {
   'use strict';
 
@@ -444,7 +444,7 @@
   async function boot() {
     bind();
     const q = new URLSearchParams(location.search);
-    if (q.get('debt') === 'SOL' || q.get('debt') === 'USDC') state.debt = q.get('debt');
+    if (q.get('debt') === 'BNB' || q.get('debt') === 'USDC') state.debt = q.get('debt');
     showVault(!!state.symbol);
     await loadMeta();
     await loadVaults();

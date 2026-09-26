@@ -11,7 +11,7 @@
   const ASSETS_RETRY_MS = 3000;
   const LIST_MAX = 3;
   const TOP_REFRESH_MS = 30000;
-  const NON_STOCKS = new Set(['SOL', 'USDT', 'USDC']);
+  const NON_STOCKS = new Set(['BNB', 'USDT', 'USDC']);
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -117,7 +117,7 @@
 
   function badgeEl() {
     const badge = h('span', 'hm-badge');
-    badge.innerHTML = '<img src="/static/img/prestocks.png" alt="" width="18" height="18">';
+    badge.innerHTML = '<img src="/static/img/bnb.svg" alt="" width="18" height="18">';
     return badge;
   }
 
